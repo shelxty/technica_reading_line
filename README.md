@@ -44,9 +44,10 @@ You can resize it to make its text bigger.
 | Thumbs up, hold for half a second | reads the line (or link / button / tab) your finger last rested on, out loud. It stays highlighted until it's finished. Links and buttons are read by their name and type, like a screen reader: "Contact us, link" |
 | Open palm (four fingers up), then move it up / down | scroll. The faster you move, the further you scroll |
 | Quick pinch (in under 0.4 seconds) (thumb + index) | click |
-| Pinch and hold, then move your hand up / down | zoom in / out, from 100% to 300% |
+| Pinch and hold, then move your hand up / down | zoom in / out, from 50% to 300% |
 
-Zoom uses the Windows Magnifier, which means it's able to be performed on any browser and any application, at any time. 
+Zoom uses the Chrome zoom function.
+
 
 ### Keys (in the preview window)
 
