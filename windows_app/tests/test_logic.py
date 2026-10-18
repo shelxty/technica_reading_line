@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir))
 
 import gestures  # noqa: E402
 import settings  # noqa: E402
-from linefinder import find_line_in_gray, high_contrast  # noqa: E402
+from linefinder import find_line_in_gray, high_contrast, line_extent  # noqa: E402
 
 P = namedtuple("P", "x y")
 
@@ -62,8 +62,28 @@ def test_open_palm():
     assert not gestures.thumbs_up_pose(h)
 
 
-def test_open_palm_needs_thumb_out():
-    assert not gestures.open_palm_pose(make_hand(index=True, middle=True, ring=True, pinky=True, thumb="tucked"))
+def test_open_palm_with_thumb_tucked_still_counts():
+    assert gestures.open_palm_pose(make_hand(index=True, middle=True, ring=True, pinky=True, thumb="tucked"))
+
+
+def test_fist():
+    assert gestures.fist_pose(make_hand(index=False, thumb="tucked"))
+    assert gestures.fist_pose(make_hand(index=False, thumb="up"))  # thumbs up is a kind of fist
+    assert not gestures.fist_pose(make_hand(index=True, thumb="tucked"))  # pointing is not
+
+
+def test_thumb_rising_only_with_curled_fingers():
+    assert gestures.thumb_rising(make_hand(index=False, thumb="up"))
+    assert not gestures.thumb_rising(make_hand(index=True, thumb="up"))  # pointing with thumb up
+    assert not gestures.thumb_rising(make_hand(index=True, thumb="pinch"))
+
+
+def test_pose_names():
+    assert gestures.pose_name(make_hand(index=True, thumb="tucked")) == "pointing"
+    assert gestures.pose_name(make_hand(index=True, middle=True, ring=True, pinky=True)) == "open palm"
+    assert gestures.pose_name(make_hand(index=False, thumb="up")) == "thumbs up"
+    assert gestures.pose_name(make_hand(index=True, middle=True, thumb="tucked")) == "two fingers"
+    assert gestures.pose_name(make_hand(thumb="pinch")) == "pinch"
 
 
 def test_thumbs_up():
@@ -85,11 +105,13 @@ def test_pinch_ratio():
 # ---------- scrolling ----------
 
 def test_scroll_deadzone_and_direction():
-    assert gestures.scroll_velocity(0.02, 0.03, 6000) == 0
-    assert gestures.scroll_velocity(0.13, 0.03, 6000) > 0  # hand up = scroll up
-    assert gestures.scroll_velocity(-0.13, 0.03, 6000) < 0
+    assert gestures.scroll_velocity(0.02, 0.03, 60) == 0
+    assert gestures.scroll_velocity(0.13, 0.03, 60) > 0  # hand up = scroll up
+    assert gestures.scroll_velocity(-0.13, 0.03, 60) < 0
     # further = faster
-    assert gestures.scroll_velocity(0.2, 0.03, 6000) > gestures.scroll_velocity(0.1, 0.03, 6000)
+    assert gestures.scroll_velocity(0.2, 0.03, 60) > gestures.scroll_velocity(0.1, 0.03, 60)
+    # a comfortable hand movement gives a few notches per second (each one gets sent as a full 120)
+    assert 3 <= gestures.scroll_velocity(0.1, 0.03, 60) <= 6
 
 
 # ---------- dwell ----------
@@ -149,6 +171,36 @@ def test_snaps_to_nearby_line_from_a_gap():
     on_line = find_line_in_gray(gray, 100, 55, pad=0)
     gap_y = on_line[3] + 3  # just below the middle line
     assert find_line_in_gray(gray, 100, gap_y, pad=0) is not None
+
+
+def render_two_columns():
+    # a long line on the left, then a big gutter, then a second column - like a 2-column page
+    img = Image.new("L", (1400, 60), 255)
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.load_default(size=18)
+    except TypeError:
+        font = ImageFont.load_default()
+    left_text = "This is a long line of text in the left column that goes past nine hundred px wide ok"
+    draw.text((20, 20), left_text, fill=0, font=font)
+    left_end = int(20 + draw.textlength(left_text, font=font))
+    draw.text((left_end + 120, 20), "right column", fill=0, font=font)
+    return np.array(img).astype(np.int16), left_end
+
+
+def test_line_extent_follows_the_whole_line_but_stops_at_the_gutter():
+    gray, left_end = render_two_columns()
+    box = find_line_in_gray(gray, 300, 30, pad=0)
+    left, right = line_extent(gray, box[1], box[3], 300)
+    assert left <= 22  # reached the start of the line
+    assert left_end - 15 <= right <= left_end + 3  # reached the end of the line...
+    assert right < left_end + 100  # ...but didn't jump the gutter into the right column
+
+
+def test_line_extent_far_from_text_is_none():
+    gray, _ = render_two_columns()
+    box = find_line_in_gray(gray, 300, 30, pad=0)
+    assert line_extent(gray, box[1], box[3], 1390) is None
 
 
 def test_blank_area_returns_none():

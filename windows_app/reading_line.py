@@ -45,7 +45,7 @@ from PIL import ImageGrab
 
 import gestures
 import settings as settings_file
-from linefinder import COLOR_PRESETS, find_line_in_gray, high_contrast
+from linefinder import COLOR_PRESETS, find_line_in_gray, high_contrast, line_extent
 from overlays import DwellRing, LineOverlay, RulerMask
 from speech import Reader
 
@@ -142,17 +142,29 @@ auto_read_done = True
 
 
 def find_line(cx, cy):
-    x0 = max(0, int(cx - S.region_w // 2))
-    x1 = min(SCREEN_W, int(cx + S.region_w // 2))
     y0 = max(0, int(cy - S.search_h))
     y1 = min(SCREEN_H, int(cy + S.search_h))
-    if x1 - x0 < 2 or y1 - y0 < 2:
+    if y1 - y0 < 2:
         return None
-    gray = np.array(grab((x0, y0, x1, y1)).convert("L")).astype(np.int16)
-    box = find_line_in_gray(gray, cx - x0, cy - y0, S.snap, S.ink_diff, S.pad)
+    # one screenshot strip across the whole screen width
+    full = np.array(grab((0, y0, SCREEN_W, y1)).convert("L")).astype(np.int16)
+
+    # 1) which rows is the line on? only look near the finger, so text in other columns doesn't confuse it
+    x0 = max(0, int(cx - S.region_w // 2))
+    x1 = min(SCREEN_W, int(cx + S.region_w // 2))
+    box = find_line_in_gray(full[:, x0:x1], cx - x0, cy - y0, S.snap, S.ink_diff, S.pad)
     if box is None:
         return None
-    return x0 + box[0], y0 + box[1], x0 + box[2], y0 + box[3]
+    top, bottom = box[1], box[3]
+
+    # 2) how far left/right does it go? follow the text across the whole screen until a big gap,
+    #    so a long line isn't cut off just because it's wider than the search area
+    extent = line_extent(full, top, bottom, cx, S.ink_diff, S.word_gap)
+    if extent is None:
+        left, right = x0 + box[0], x0 + box[2]
+    else:
+        left, right = max(0, extent[0] - S.pad), min(SCREEN_W, extent[1] + S.pad)
+    return left, y0 + top, right, y0 + bottom
 
 
 def show_line_visuals():
@@ -243,6 +255,8 @@ zoom_mode = False
 anchor_y = 0.0
 zoom_level = 0
 frozen = (sx, sy)
+pending_click = None  # (point, time) of a pinch click waiting to happen
+pinch_blocked = False  # after a fist, no pinching until the index finger is up again
 status = "Move your hand"
 
 two_start = None
@@ -252,7 +266,7 @@ palm_start = None  # open palm first seen
 palm_lost = None  # open palm last lost (short grace period so scrolling doesn't stutter)
 scrolling = False
 scroll_anchor = 0.0
-scroll_acc = 0.0  # leftover fraction of a scroll step
+scroll_acc = 0.0  # leftover fraction of a mouse-wheel notch
 
 thumb_start = None
 thumb_fired = False
@@ -288,6 +302,7 @@ try:
                 hand = result.hand_landmarks[0]
                 draw_landmarks(frame, hand)
                 ratio = gestures.pinch_ratio(hand)
+                pose_info = f"pose: {gestures.pose_name(hand)}   pinch: {ratio:.2f}"
                 palm = not pinching and gestures.open_palm_pose(hand)
                 thumbs = not pinching and gestures.thumbs_up_pose(hand)
                 two = not pinching and gestures.two_finger_pose(hand)
@@ -314,12 +329,13 @@ try:
                     palm_start = None
 
                 if scrolling:
-                    v = gestures.scroll_velocity(scroll_anchor - hand[9].y, S.scroll_deadzone, S.scroll_speed)
+                    v = gestures.scroll_velocity(scroll_anchor - hand[9].y, S.scroll_deadzone, S.scroll_notches)
                     scroll_acc += v * dt
-                    step = int(scroll_acc)
-                    if step:
-                        pyautogui.scroll(step)  # windows wheel units, 120 = one notch
-                        scroll_acc -= step
+                    notches = int(scroll_acc)
+                    if notches:
+                        # always whole notches (120 each): lots of windows apps ignore anything smaller
+                        pyautogui.scroll(notches * 120)
+                        scroll_acc -= notches
                     status = "Scrolling" + (" up" if v > 0 else " down" if v < 0 else " (move palm up/down)")
 
                 # --- pointing: move the cursor ---
@@ -342,7 +358,8 @@ try:
                         progress, fire = dwell.update(sx, sy, now)
                         if fire:
                             ring.hide()
-                            pyautogui.click()
+                            root.update()  # actually remove the ring before clicking
+                            pyautogui.click(*clamp_to_screen(sx, sy))
                             status = "DWELL CLICK"
                         elif progress > 0.1:
                             ring.show(sx, sy, progress)
@@ -355,8 +372,29 @@ try:
                     dwell.reset()
                     ring.hide()
 
-                # --- pinch = click, pinch + hold = zoom (same as before) ---
-                if not pinching and not scrolling and ratio < S.pinch_enter:
+                # --- pinch = click, pinch + hold = zoom ---
+                # making a thumbs-up drags the index finger past the thumb, which looks like a pinch.
+                # so: a pinch that turns into a thumbs-up is cancelled, and every click waits click_confirm
+                # seconds in case the thumb is on its way up
+                thumb_going_up = gestures.thumbs_up_pose(hand) or gestures.thumb_rising(hand)
+                if pinch_blocked and gestures.finger_up(hand, 8, 6) and not thumb_going_up:
+                    pinch_blocked = False  # index finger is back up, pinching allowed again
+
+                if pending_click and thumb_going_up:
+                    pending_click = None
+                    status = "Click cancelled (thumbs up)"
+                elif pending_click and now - pending_click[1] >= S.click_confirm:
+                    pyautogui.click(*clamp_to_screen(*pending_click[0]))
+                    pending_click = None
+                    status = "CLICK"
+
+                if pinching and not zoom_mode and gestures.thumbs_up_pose(hand):
+                    pinching = False
+                    pinch_blocked = True
+                    history.clear()
+                    status = "Thumbs up (no click)"
+
+                if not pinching and not pinch_blocked and not scrolling and ratio < S.pinch_enter:
                     pinching = True
                     pinch_start = now
                     zoom_mode = False
@@ -385,8 +423,7 @@ try:
                 if pinching and ratio > S.pinch_exit:
                     pinching = False
                     if not zoom_mode:
-                        pyautogui.click()  # quick pinch = click
-                        status = "CLICK"
+                        pending_click = (frozen, now)  # quick pinch = click (in a moment, see above)
                     else:
                         status = "Zoom set"
                     history.clear()
@@ -411,7 +448,7 @@ try:
                     if thumb_start is None:
                         thumb_start = now
                         # curling the index finger drags the cursor down, so use where it was a few frames ago
-                        thumb_point = history[0] if history else (sx, sy)
+                        thumb_point = history[0] if history else frozen
                     elif not thumb_fired and now - thumb_start >= S.read_hold:
                         thumb_fired = True
                         status = read_line_at(*thumb_point)
@@ -427,7 +464,9 @@ try:
                     auto_read_done = True
                     reader.read_image(grab(line_box))
             else:
+                pose_info = "pose: no hand"
                 status = "No hand"
+                pending_click = None
                 two_start = None
                 two_fired = False
                 thumb_start = None
@@ -445,8 +484,9 @@ try:
                      f"Auto-read {'on' if S.auto_read else 'off'} | Dwell {'on' if S.dwell_on else 'off'} | {preset}")
             cv2.putText(frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
             cv2.putText(frame, flags, (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+            cv2.putText(frame, pose_info, (10, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             if reader.status:
-                cv2.putText(frame, reader.status, (10, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                cv2.putText(frame, reader.status, (10, 106), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
             cv2.putText(frame, HELP, (10, frame.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
             cv2.imshow(WINDOW, frame)
 

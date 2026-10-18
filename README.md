@@ -40,7 +40,7 @@ A preview window with your webcam shows up. Click on it once so it gets your key
 | Quick pinch (thumb + index) | click |
 | Pinch & hold, then hand up / down | zoom in / out (Windows Magnifier) |
 | Hold index + middle finger up | highlight on / off |
-| **Open palm**, then move it up / down | **scroll** (the further you move from where you started, the faster) |
+| **Open palm** (all four fingers up), then move it up / down | **scroll** (the further you move from where you started, the faster) |
 | **Thumbs up**, hold for half a second | **read the line you were pointing at out loud** |
 | **Hold the cursor still** (dwell mode on) | **click** without pinching |
 
@@ -58,6 +58,10 @@ A preview window with your webcam shows up. Click on it once so it gets your key
 | `[` / `]` | ruler darker / lighter |
 | `-` / `=` | voice slower / faster |
 | `q` or `Esc` | quit |
+
+The preview window also shows **`pose:`**, the gesture the app thinks you're making, plus your pinch
+value. If a gesture doesn't work, look there first. For example, if scrolling does nothing, check that it
+says `open palm` while your hand is open.
 
 Your choices are saved in `windows_app/settings.json`. That file also has every other setting
 (smoothing, pinch sensitivity, dwell time, scroll speed...). Close the app before editing it.

@@ -55,6 +55,44 @@ def find_line_in_gray(gray, rx, ry, snap=12, ink_diff=40, pad=3):
             min(w, int(cols.max()) + 1 + pad), min(h, bot + 1 + pad))
 
 
+def line_extent(gray, top, bottom, x, ink_diff=40, word_gap=1.5):
+    """gray = a full-screen-width strip, [top, bottom) = the rows of one line, x = fingertip.
+    walks left and right from the text nearest the fingertip, and stops at the first gap wider than
+    word_gap line-heights (a column edge, sidebar, etc). returns (left, right) or None"""
+    rows = gray[top:bottom]
+    if rows.size == 0:
+        return None
+    ink = np.abs(rows - np.median(rows)) > ink_diff
+    col_has_ink = ink.any(axis=0)
+    w = len(col_has_ink)
+    max_gap = max(8, int(word_gap * (bottom - top)))
+
+    cols = np.where(col_has_ink)[0]
+    if len(cols) == 0:
+        return None
+    start = int(cols[np.argmin(np.abs(cols - x))])  # text column closest to the finger
+    if abs(start - x) > max_gap:
+        return None
+
+    left, gap = start, 0
+    for c in range(start - 1, -1, -1):
+        if col_has_ink[c]:
+            left, gap = c, 0
+        else:
+            gap += 1
+            if gap > max_gap:
+                break
+    right, gap = start, 0
+    for c in range(start + 1, w):
+        if col_has_ink[c]:
+            right, gap = c, 0
+        else:
+            gap += 1
+            if gap > max_gap:
+                break
+    return left, right + 1
+
+
 def high_contrast(rgb, bg_color, fg_color):
     """rgb = HxWx3 screenshot of one line. returns the same line redrawn as text color on bg color"""
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)

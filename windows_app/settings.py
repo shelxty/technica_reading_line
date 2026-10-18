@@ -17,6 +17,7 @@ DEFAULTS = {
     "max_zoom": 5,
     "lookback": 6,  # use cursor position from this many frames ago when a pinch starts
     "two_finger_hold": 0.8,
+    "click_confirm": 0.25,  # wait this long after a pinch before clicking, so a thumbs-up can cancel it
 
     # line detection
     "region_w": 900,  # width of screenshot strip
@@ -24,6 +25,7 @@ DEFAULTS = {
     "snap": 12,  # snap to text within this many px if the fingertip is between lines
     "ink_diff": 40,  # how different a pixel must be from the background to count as text
     "pad": 3,  # extra px of padding around the highlighted line
+    "word_gap": 1.5,  # a horizontal gap wider than this many line-heights = end of the line (column edge)
 
     # highlight look (index into linefinder.COLOR_PRESETS)
     "color_preset": 0,
@@ -48,7 +50,7 @@ DEFAULTS = {
     # open-palm scrolling
     "palm_enter": 0.25,  # hold an open palm this long to start scrolling
     "scroll_deadzone": 0.03,  # how far (fraction of camera height) to move before scrolling starts
-    "scroll_speed": 6000,  # scroll speed per unit of hand movement (120 = one mouse-wheel notch)
+    "scroll_notches": 60,  # scroll speed: mouse-wheel notches per second per unit of hand movement
 }
 
 

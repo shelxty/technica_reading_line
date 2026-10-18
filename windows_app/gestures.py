@@ -39,10 +39,35 @@ def two_finger_pose(hand):
 
 
 def open_palm_pose(hand):
-    # all four fingers up and the thumb sticking out = scroll mode
-    fingers = all(finger_up(hand, tip, pip) for tip, pip in FINGERS)
-    thumb_out = dist(hand[4], hand[5]) > 0.5 * palm_size(hand)
-    return fingers and thumb_out
+    # all four fingers up = scroll mode (thumb can be anywhere)
+    return all(finger_up(hand, tip, pip) for tip, pip in FINGERS)
+
+
+def fist_pose(hand):
+    return all(finger_folded(hand, tip, pip) for tip, pip in FINGERS)
+
+
+def thumb_rising(hand):
+    # fingers curled and the thumb starting to point up: on its way to a thumbs-up.
+    # (after a real pinch the index finger opens up again, so this doesn't match)
+    return fist_pose(hand) and hand[4].y < hand[3].y < hand[2].y
+
+
+def pose_name(hand):
+    # for the preview window, so you can see what the app thinks your hand is doing
+    if pinch_ratio(hand) < 0.3:
+        return "pinch"
+    if open_palm_pose(hand):
+        return "open palm"
+    if thumbs_up_pose(hand):
+        return "thumbs up"
+    if two_finger_pose(hand):
+        return "two fingers"
+    if fist_pose(hand):
+        return "fist"
+    if finger_up(hand, 8, 6):
+        return "pointing"
+    return "-"
 
 
 def thumbs_up_pose(hand):
@@ -55,7 +80,7 @@ def thumbs_up_pose(hand):
 
 def scroll_velocity(offset, deadzone, speed):
     # joystick-style: the further your palm is from where it started, the faster it scrolls.
-    # offset > 0 = hand moved up = scroll up. returns wheel units per second
+    # offset > 0 = hand moved up = scroll up. returns mouse-wheel notches per second
     if abs(offset) <= deadzone:
         return 0.0
     return math.copysign((abs(offset) - deadzone) * speed, offset)
