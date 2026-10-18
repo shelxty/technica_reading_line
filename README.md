@@ -1,4 +1,4 @@
-# technica_reading_line
+# Wavi: Highlighted Accessibility
 
 Point at text with your finger (via webcam) to highlight the line you're reading,
 pinch to click, pinch-and-hold to zoom.
