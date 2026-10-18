@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Reading Line – Read with your hands",
+  "name": "Wavy – Read the web with your hands",
   "version": "2.0.0",
   "description": "Point to move, two fingers to highlight, thumbs up to hear the line, palm to scroll, pinch to click and zoom.",
   "permissions": ["offscreen", "storage", "scripting", "tabs", "tts"],
@@ -10,7 +10,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Reading Line",
+    "default_title": "Wavy",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

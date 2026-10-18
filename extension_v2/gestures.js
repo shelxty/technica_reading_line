@@ -59,10 +59,11 @@
     return d > 0 ? dist(hand[tip], hand[0]) / d : 1;
   };
 
-  // up / down for each finger, with two thresholds: a finger has to straighten clearly to count as up
-  // and bend clearly to count as down. a half-bent finger keeps its last state instead of flickering
+  // up / down for each finger, the same test as hand_cursor1.py: a finger is up when its tip is above its
+  // middle joint. with a small dead band (measured in palm sizes) so a half-bent finger keeps its last
+  // state instead of flickering between ☝️ and ✌️
   class FingerState {
-    constructor({ up = 1.15, down = 1.05 } = {}) {
+    constructor({ up = 0.06, down = -0.02 } = {}) {
       this.upAt = up;
       this.downAt = down;
       this.reset();
@@ -71,10 +72,11 @@
       this.state = [false, false, false, false];
     }
     update(hand) {
+      const palm = palmSize(hand) || 1;
       this.state = FINGERS.map(([tip, pip], i) => {
-        const r = fingerRatio(hand, tip, pip);
-        if (r >= this.upAt) return true;
-        if (r <= this.downAt) return false;
+        const lift = (hand[pip].y - hand[tip].y) / palm; // > 0 = tip above the joint
+        if (lift >= this.upAt) return true;
+        if (lift <= this.downAt) return false;
         return this.state[i];
       });
       return this.state;

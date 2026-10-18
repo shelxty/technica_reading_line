@@ -124,20 +124,22 @@ test("a fist with the thumb over the fingers is not a pinch (no accidental click
 
 test("a half-bent finger keeps its state instead of flickering", () => {
   const f = new G.FingerState();
-  const straight = hand({ index: true, middle: true });
-  assert.deepEqual(f.update(straight), [true, true, false, false]);
-  // middle finger half bent: ratio between the two thresholds, wobbling a little
-  const half = (wobble) => {
+  assert.deepEqual(f.update(hand({ index: true, middle: true })), [true, true, false, false]);
+  // middle finger half bent: its tip hovers near its middle joint, wobbling a little (inside the dead band)
+  const half = (lift) => {
     const h = hand({ index: true, middle: true });
-    const wrist = h[0], pip = h[10];
-    const target = G.dist(pip, wrist) * (1.1 + wobble); // tip-to-wrist distance for ratio 1.1 +- wobble
-    const ux = (h[12].x - wrist.x), uy = (h[12].y - wrist.y), len = Math.hypot(ux, uy);
-    h[12] = { x: wrist.x + (ux / len) * target, y: wrist.y + (uy / len) * target };
+    h[12] = { x: h[12].x, y: h[10].y - lift * G.palmSize(h) };
     return h;
   };
-  for (const w of [0.03, -0.03, 0.02, -0.04, 0.03]) assert.equal(f.update(half(w))[1], true); // stays up
+  for (const w of [0.04, 0.0, 0.05, -0.01, 0.03]) assert.equal(f.update(half(w))[1], true); // stays up
   f.update(hand({ index: true })); // clearly bent now
-  for (const w of [0.03, -0.03, 0.02]) assert.equal(f.update(half(w))[1], false); // stays down
+  for (const w of [0.04, 0.0, 0.05, -0.01, 0.03]) assert.equal(f.update(half(w))[1], false); // stays down
+});
+
+test("pointing with a loosely curled middle finger is one finger, not two", () => {
+  const h = hand({ index: true });
+  h[12] = { x: h[12].x, y: h[10].y + 0.01 }; // middle tip just below its joint
+  assert.equal(G.poseFrom(h, new G.FingerState().update(h)), "one");
 });
 
 test("steady poses: one, two, palm, thumbs, fist", () => {

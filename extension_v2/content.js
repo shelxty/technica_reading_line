@@ -1,4 +1,4 @@
-// Reading Line v2 - runs in every web page (and in the tutorial page).
+// Wavy - runs in every web page (and in the tutorial page).
 // gets the 21 hand points for every camera frame and turns them into:
 //   ☝️ one finger      -> cursor
 //   ✌️ two fingers     -> cursor + highlight what's under it (a line of text, or just the link / button)
@@ -22,8 +22,7 @@
     holdToZoom: 0.45, // hold a pinch this long to zoom instead of click
     zoomStep: 0.06, // hand movement (fraction of camera height) per zoom step
     clickConfirm: 0.2, // wait this long before clicking, so a thumbs-up can cancel it
-    lookback: 0.25, // when a pinch / curl starts, use where the cursor was this long ago
-    curlRatio: 0.75, // index finger bent below this much of its length = it's curling: hold the cursor
+    lookback: 0.2, // when a pinch starts / the finger curls, use where the cursor was this long ago
     readHold: 0.4, // hold a thumbs-up this long to read
     stillPx: 2, // ignore wobbles smaller than this
     keepHighlight: 3, // after leaving ✌️, the highlight stays this many seconds (time to do 👍)
@@ -155,7 +154,7 @@
         <div class="badge"></div>
       </div>
       <div class="hud">
-        <div class="top"><div class="dot"></div>Reading Line<div class="pill">Active</div></div>
+        <div class="top"><div class="dot"></div>Wavy<div class="pill">Active</div></div>
         <canvas width="448" height="264"></canvas>
         <div class="chips">${CHIPS.map(([k, e, l]) => `<div class="chip" data-k="${k}">${e}<span>${l}</span></div>`).join("")}</div>
         <div class="status"></div>
@@ -207,7 +206,7 @@
     ui.hud.style.display = S.showPreview && visible ? "block" : "none";
   }
 
-  let mode = "point";
+  let mode = null; // nothing yet, so the first ☝️ also counts as switching into pointing
   let badgeTimer = 0;
   function setMode(next, label) {
     const m = MODES[next];
@@ -219,18 +218,12 @@
       clearTimeout(badgeTimer);
       // the plain pointer only flashes its badge; every other mode keeps it on while it lasts
       if (next === "point") badgeTimer = setTimeout(() => ui.badge.classList.remove("show"), 900);
-      if (next !== "point" && next !== "pinch") emitModeOnce(next);
+      if (next === "point" || next === "highlight" || next === "scroll") emit(next); // tells the tutorial
       mode = next;
     } else if (next !== "point") {
       ui.badge.classList.add("show");
     }
     ui.chips.forEach((c) => c.classList.toggle("on", c.dataset.k === (next === "thumbs" ? "read" : next)));
-  }
-  const emitted = new Set();
-  function emitModeOnce(m) {
-    // highlight / scroll / zoom... -> tell the tutorial (only once per mode change)
-    if (m === "highlight" || m === "scroll") emit(m);
-    emitted.add(m);
   }
 
   function moveCursor(x, y) {
@@ -268,7 +261,7 @@
     const pts = hand.map((p) => [p.x * c.width, p.y * c.height]);
     ctx.lineCap = "round";
     ctx.lineWidth = 5;
-    ctx.strokeStyle = MODES[mode].color;
+    ctx.strokeStyle = MODES[mode || "point"].color;
     for (const [a, b] of HAND_LINES) {
       ctx.beginPath();
       ctx.moveTo(...pts[a]);
@@ -782,16 +775,17 @@
   const now = () => performance.now() / 1000;
   const fingers = new G.FingerState(); // up / down per finger, without flicker
   const stab = new G.PoseStabilizer(4); // a mode has to show for 4 frames (~0.13 s) before it switches
-  const fx = new G.OneEuro();
-  const fy = new G.OneEuro();
+  // cursor smoothing: light enough to feel instant, still steady when the finger is still
+  const fx = new G.OneEuro(0.8, 0.01);
+  const fy = new G.OneEuro(0.8, 0.01);
   const wave = new G.WaveDetector();
   const stable = new G.StableTarget(T.restTime);
   const drag = new G.DragScroller();
   let cx = innerWidth / 2;
   let cy = innerHeight / 2;
   let history = []; // [t, x, y]
-  let extRef = 0;
-  let curlFrozen = false;
+  let lastIndexUp = false;
+  let lastPointEmit = 0;
   let pinching = false;
   let pinchStart = 0;
   let zoomMode = false;
@@ -828,8 +822,7 @@
     fx.reset();
     fy.reset();
     drag.reset();
-    extRef = 0;
-    curlFrozen = false;
+    lastIndexUp = false;
     pinching = false;
     zoomMode = false;
     pendingClick = null;
@@ -854,7 +847,8 @@
       return;
     }
     ui.cursor.style.opacity = "1";
-    const raw = G.poseFrom(hand, fingers.update(hand), T.pinchEnter);
+    const up = fingers.update(hand); // [index, middle, ring, pinky] up?
+    const raw = G.poseFrom(hand, up, T.pinchEnter);
     const pose = stab.update(raw);
 
     // 👋 wave (open hand swinging sideways) -> sleep / wake
@@ -872,23 +866,22 @@
       return;
     }
 
-    // index finger curling (on the way to 👍 / a fist)? hold the cursor where you were pointing
-    const ext = G.indexExtension(hand);
-    if (!curlFrozen) extRef = Math.max(ext, extRef * 0.995);
-    if (!curlFrozen && !pinching && ext < T.curlRatio * extRef) {
-      curlFrozen = true;
+    // index finger went down (curling into 👍 or a fist)? the fingertip slid on the way down, so put
+    // the cursor back where you were pointing a moment ago, and keep it there
+    const indexUp = up[0];
+    if (!indexUp && lastIndexUp && !pinching) {
       [cx, cy] = pointBefore(t, T.lookback);
       moveCursor(cx, cy);
-    } else if (curlFrozen && ext >= (T.curlRatio + 0.1) * extRef) {
-      curlFrozen = false;
-      fx.reset();
-      fy.reset();
-      fx.filter(cx, t);
-      fy.filter(cy, t);
     }
+    if (indexUp && !lastIndexUp) {
+      fx.reset(); // start following the finger again from where the cursor is
+      fy.reset();
+    }
+    lastIndexUp = indexUp;
 
-    // ☝️ / ✌️ move the cursor
-    if (!pinching && !curlFrozen && (raw === "one" || raw === "two" || raw === "none")) {
+    // ☝️ / ✌️ the cursor follows the index fingertip on every frame it's up (like hand_cursor1.py),
+    // whatever the other fingers are doing - so switching between ☝️ and ✌️ never stops the cursor
+    if (!pinching && indexUp && raw !== "palm") {
       const [tx, ty] = toView(hand[8]);
       const nx = fx.filter(tx, t);
       const ny = fy.filter(ty, t);
@@ -929,7 +922,7 @@
       pinching = true;
       pinchStart = t;
       zoomMode = false;
-      frozen = curlFrozen ? [cx, cy] : pointBefore(t, T.lookback); // closing the fingers drags the tip
+      frozen = pointBefore(t, T.lookback); // closing the fingers drags the tip, so use where it was just before
       [cx, cy] = frozen;
       moveCursor(cx, cy);
     } else if (pinching && !zoomMode && t - pinchStart > hold("holdToZoom")) {
@@ -999,6 +992,12 @@
     else if (pose === "thumbs") m = "thumbs";
     else if (pose === "two") m = "highlight";
     setMode(m, label);
+    // keep telling the tutorial "pointing" (at most once a second), so a step can tick even if you
+    // were already pointing when you got to it
+    if (m === "point" && t - lastPointEmit > 1) {
+      lastPointEmit = t;
+      emit("point");
+    }
     if (!reading) {
       setStatus({
         point: "☝️ Pointing · ✌️ two fingers to highlight",
@@ -1008,10 +1007,6 @@
         zoom: "🔍 Move up to zoom in, down to zoom out",
         thumbs: thumbTarget ? "👍 Keep holding to read…" : "✌️ Highlight a line first, then 👍",
       }[m] || "");
-    }
-    if (m === "point" && !emitted.has("point")) {
-      emit("point");
-      emitted.add("point");
     }
     drawHud(hand);
   }

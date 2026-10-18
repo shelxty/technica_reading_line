@@ -48,7 +48,7 @@ async function updateBadge() {
   const { running, sleeping } = await chrome.storage.session.get(["running", "sleeping"]);
   chrome.action.setBadgeText({ text: running ? (sleeping ? "Zz" : "ON") : "" });
   chrome.action.setBadgeBackgroundColor({ color: sleeping ? "#475569" : "#15803d" });
-  chrome.action.setTitle({ title: running ? (sleeping ? "Reading Line: sleeping" : "Reading Line: on") : "Reading Line: off" });
+  chrome.action.setTitle({ title: running ? (sleeping ? "Wavy: sleeping" : "Wavy: on") : "Wavy: off" });
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && (changes.running || changes.sleeping)) updateBadge();

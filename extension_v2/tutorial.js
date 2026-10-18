@@ -1,64 +1,103 @@
-// the tutorial: asks for the camera, then ticks off each gesture as you do it
+// the step-by-step tutorial: one gesture at a time. content.js (the gesture engine, running on this page
+// too) tells us what you did, and the step celebrates when it sees the gesture it's teaching
 
 const $ = (s) => document.querySelector(s);
-const steps = [...document.querySelectorAll(".step")];
+const panels = [...document.querySelectorAll(".panel")];
+const navButtons = [...document.querySelectorAll(".stepper button")];
 const live = $("#live");
-const NAMES = { point: "Point", highlight: "Highlight", read: "Read out loud", click: "Click", zoom: "Zoom", scroll: "Scroll", wake: "Pause and resume" };
+const backBtn = $("#back");
+const nextBtn = $("#next");
+const LAST = panels.length - 1; // the "all done" panel
+const GESTURES = LAST - 1; // steps 1..7 are gestures
+const learned = new Set();
+let current = 0;
 
-function markDone(step, how = "done") {
-  if (step.classList.contains("done")) return;
-  step.classList.add("done", "just-done");
-  setTimeout(() => step.classList.remove("just-done"), 400);
-  step.querySelector(".done-text").textContent = how === "skipped" ? "Skipped" : "Done ✓";
-  const done = steps.filter((s) => s.classList.contains("done")).length;
-  const bar = $("#progress");
-  bar.setAttribute("aria-valuenow", String(done));
-  bar.setAttribute("aria-valuetext", `${done} of ${steps.length} gestures learned`);
-  bar.querySelector(".bar").style.width = `${(done / steps.length) * 100}%`;
-  $("#progress-text").textContent = `${done} of ${steps.length}`;
-  live.textContent = how === "skipped" ? `${NAMES[step.dataset.event]} skipped.` : `Nice! ${NAMES[step.dataset.event]} done.`;
-  if (done === steps.length) {
-    const end = $("#all-done");
-    end.hidden = false;
-    end.focus({ preventScroll: true });
-    live.textContent = "You've learned all the gestures. You're all set!";
-  }
+function show(index, { focus = true } = {}) {
+  current = Math.max(0, Math.min(LAST, index));
+  panels.forEach((p, i) => (p.hidden = i !== current));
+  navButtons.forEach((b, i) => {
+    if (i === current) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
+  });
+  const panel = panels[current];
+  const title = panel.querySelector("h2").textContent;
+  $("#step-count").textContent = `Step ${current + 1} of ${panels.length}`;
+  backBtn.disabled = current === 0;
+  updateNext();
+  live.textContent = `Step ${current + 1} of ${panels.length}: ${title}`;
+  if (focus) panel.querySelector("h2").focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
-steps.forEach((step) => step.querySelector(".skip-step").addEventListener("click", () => markDone(step, "skipped")));
+function updateNext() {
+  if (current === LAST) {
+    nextBtn.textContent = "Start reading the web →";
+    return;
+  }
+  const done = current === 0 ? cameraOn : learned.has(current);
+  nextBtn.textContent = done ? "Next →" : "Skip this step →";
+}
 
-// content.js (the gesture engine, also running on this page) tells us what you did
+function markStep(index, how = "done") {
+  if (index < 1 || index > GESTURES || learned.has(index)) return;
+  learned.add(index);
+  const btn = navButtons[index];
+  btn.classList.add("done");
+  btn.querySelector(".state").textContent = how === "skipped" ? "Skipped" : "Done ✓";
+  const bar = document.querySelector(".progress");
+  bar.setAttribute("aria-valuenow", String(learned.size));
+  bar.setAttribute("aria-valuetext", `${learned.size} of ${GESTURES} gestures learned`);
+  bar.querySelector(".bar").style.width = `${(learned.size / GESTURES) * 100}%`;
+  if (how === "done") {
+    const panel = panels[index];
+    panel.classList.add("success");
+    panel.querySelector(".feedback").textContent = "✓ You did it! Press Next when you're ready.";
+    if (index === current) live.textContent = "You did it! Press Next when you're ready.";
+  }
+  updateNext();
+}
+
+backBtn.addEventListener("click", () => show(current - 1));
+nextBtn.addEventListener("click", () => {
+  if (current === LAST) return window.close();
+  if (current >= 1 && !learned.has(current)) markStep(current, "skipped");
+  if (current === 0 && !cameraOn) navButtons[0].querySelector(".state").textContent = "Skipped";
+  show(current + 1);
+});
+navButtons.forEach((b) => b.addEventListener("click", () => show(Number(b.dataset.go))));
+
+// gestures, as reported by the engine. only the step you're on counts, so the steps go in order
 let slept = false;
 window.addEventListener("readingline", (e) => {
   const event = e.detail.event;
   if (event === "sleep") slept = true;
-  if (event === "wake" && !slept) return; // has to be a full pause + resume
-  const step = steps.find((s) => s.dataset.event === event);
-  if (step) markDone(step);
+  if (event === "wake" && !slept) return; // a full pause + resume
+  const panel = panels[current];
+  if (panel.dataset.event === event) markStep(current);
 });
 
 $("#demo-button").addEventListener("click", () => {
   $("#demo-result").textContent = "✓ Clicked!";
+  if (panels[current].dataset.event === "demo-click") markStep(current);
   setTimeout(() => ($("#demo-result").textContent = ""), 2500);
 });
-$("#demo-link").addEventListener("click", (e) => {
-  e.preventDefault();
-  $("#steps").scrollIntoView({ block: "start" });
-});
+document.querySelector(".demo-link").addEventListener("click", (e) => e.preventDefault());
 
 // ---------- camera ----------
 
 const allow = $("#allow");
 const msg = $("#camera-msg");
+let cameraOn = false;
 
 function cameraReady() {
+  cameraOn = true;
   allow.disabled = true;
   allow.textContent = "✓ Camera is on";
-}
-
-async function checkRunning() {
-  const { running } = await chrome.storage.session.get({ running: false });
-  if (running) cameraReady();
+  msg.textContent = "The camera is on. Raise your hand, then press Next.";
+  panels[0].classList.add("success");
+  navButtons[0].classList.add("done");
+  navButtons[0].querySelector(".state").textContent = "Done ✓";
+  updateNext();
 }
 
 allow.addEventListener("click", async () => {
@@ -67,7 +106,6 @@ allow.addEventListener("click", async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     stream.getTracks().forEach((t) => t.stop()); // we only needed the permission
     await chrome.runtime.sendMessage({ target: "background", type: "start" });
-    msg.textContent = "The camera is on. Show your hand and try the gestures below.";
     cameraReady();
   } catch (e) {
     msg.textContent = e.name === "NotAllowedError"
@@ -77,12 +115,8 @@ allow.addEventListener("click", async () => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session" && changes.running) {
-    if (changes.running.newValue) cameraReady();
-    else {
-      allow.disabled = false;
-      allow.textContent = "Allow camera and start";
-    }
-  }
+  if (area === "session" && changes.running && changes.running.newValue) cameraReady();
 });
-checkRunning();
+chrome.storage.session.get({ running: false }).then(({ running }) => running && cameraReady());
+
+show(0, { focus: false });

@@ -3,109 +3,230 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Learn Reading Line</title>
+  <title>Learn Wavy, step by step</title>
   <link rel="icon" href="icons/icon32.png">
   <link rel="stylesheet" href="tutorial.css">
 </head>
 <body>
-  <a class="skip" href="#steps">Skip to the gestures</a>
+  <a class="skip-link" href="#panel-title-0">Skip to the current step</a>
+
   <header class="hero">
-    <img src="icons/icon128.png" alt="" width="72" height="72">
+    <img src="icons/icon128.png" alt="" width="64" height="64">
     <div>
-      <h1>Read the web with your hands</h1>
-      <p>Reading Line follows your hand with your webcam. Learn the seven gestures here. It takes about a minute.</p>
+      <p class="eyebrow">Welcome to</p>
+      <h1>Wavy</h1>
+      <p class="tagline">Read the web with your hands. Learn each gesture step by step. It takes about two minutes.</p>
     </div>
   </header>
 
-  <main>
-    <section class="camera card" aria-labelledby="camera-title">
-      <h2 id="camera-title"><span aria-hidden="true">📷</span> Step 1: Turn on the camera</h2>
-      <p>Video never leaves your computer. Hand tracking runs inside the extension.</p>
-      <button id="allow" type="button" class="primary">Allow camera and start</button>
-      <p id="camera-msg" class="msg" role="status" aria-live="polite"></p>
-    </section>
+  <div class="layout">
+    <nav class="stepper" aria-label="Tutorial steps">
+      <ol>
+        <li><button type="button" data-go="0"><span class="num" aria-hidden="true">📷</span><span class="name">Get ready</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="1"><span class="num" aria-hidden="true">☝️</span><span class="name">Point</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="2"><span class="num" aria-hidden="true">✌️</span><span class="name">Highlight</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="3"><span class="num" aria-hidden="true">👍</span><span class="name">Read aloud</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="4"><span class="num" aria-hidden="true">🤏</span><span class="name">Click</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="5"><span class="num" aria-hidden="true">🔍</span><span class="name">Zoom</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="6"><span class="num" aria-hidden="true">🖐️</span><span class="name">Scroll</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="7"><span class="num" aria-hidden="true">👋</span><span class="name">Pause &amp; resume</span><span class="state">To do</span></button></li>
+        <li><button type="button" data-go="8"><span class="num" aria-hidden="true">🎉</span><span class="name">All done</span><span class="state"></span></button></li>
+      </ol>
+    </nav>
 
-    <section aria-labelledby="practice-title">
-      <h2 id="practice-title">Step 2: Try each gesture</h2>
+    <main>
       <div class="progress-row">
-        <div id="progress" class="progress" role="progressbar" aria-label="Gestures learned" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0" aria-valuetext="0 of 7 gestures learned">
-          <div class="bar"></div>
-        </div>
-        <span id="progress-text" class="progress-text">0 of 7</span>
+        <p id="step-count" class="step-count">Step 1 of 9</p>
+        <div class="progress" role="progressbar" aria-label="Gestures learned" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0" aria-valuetext="0 of 7 gestures learned"><div class="bar"></div></div>
       </div>
       <p id="live" class="sr-only" role="status" aria-live="polite"></p>
 
-      <ol id="steps" class="steps">
-        <li class="step" data-event="point">
-          <span class="emoji" aria-hidden="true">☝️</span>
-          <div><h3>Point</h3><p>Hold up one finger and move it. The cursor follows.</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> point</span></button>
-        </li>
-        <li class="step" data-event="highlight">
-          <span class="emoji" aria-hidden="true">✌️</span>
-          <div><h3>Highlight</h3><p>Hold up two fingers over the paragraph below. The line turns yellow. Over a link or button, just that gets highlighted.</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> highlight</span></button>
-        </li>
-        <li class="step" data-event="read">
-          <span class="emoji" aria-hidden="true">👍</span>
-          <div><h3>Read out loud</h3><p>Highlight a line with two fingers, then give a thumbs up and hold it. It reads to the end of the paragraph, scrolling as it goes, and each word lights up. To stop: thumbs up again, press <kbd>Esc</kbd>, or wave. Thumbs up once more to continue from where you stopped.</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> read out loud</span></button>
-        </li>
-        <li class="step" data-event="click">
-          <span class="emoji" aria-hidden="true">🤏</span>
-          <div><h3>Click</h3><p>Point at the "Click me" button and quickly pinch your thumb and index finger.</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> click</span></button>
-        </li>
-        <li class="step" data-event="zoom">
-          <span class="emoji" aria-hidden="true">🔍</span>
-          <div><h3>Zoom</h3><p>Pinch and hold until the ring fills, then move your hand up to zoom in or down to zoom out (50% to 300%).</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> zoom</span></button>
-        </li>
-        <li class="step" data-event="scroll">
-          <span class="emoji" aria-hidden="true">🖐️</span>
-          <div><h3>Scroll</h3><p>Open your hand and move it up or down. The page moves with it like a sheet of paper.</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> scroll</span></button>
-        </li>
-        <li class="step" data-event="wake">
-          <span class="emoji" aria-hidden="true">👋</span>
-          <div><h3>Pause and resume</h3><p>Wave side to side to pause gestures (handy when you talk with your hands). Wave again to resume.</p></div>
-          <span class="done-text">Not yet</span><button type="button" class="skip-step">Skip<span class="sr-only"> pause and resume</span></button>
-        </li>
-      </ol>
-    </section>
+      <!-- 0: camera -->
+      <section class="panel" data-step="0" aria-labelledby="panel-title-0">
+        <div class="art" aria-hidden="true"><span>📷</span></div>
+        <div class="body">
+          <h2 id="panel-title-0" tabindex="-1">Get ready: turn on the camera</h2>
+          <ol class="how">
+            <li>Sit about an arm's length from your screen, in good light.</li>
+            <li>Click <strong>Allow camera and start</strong>, then choose <strong>Allow</strong> in Chrome's prompt.</li>
+            <li>Raise your hand. A small panel in the corner shows your hand's skeleton.</li>
+          </ol>
+          <p class="note"><span aria-hidden="true">🔒</span> Video never leaves your computer. Hand tracking runs inside the extension.</p>
+          <button id="allow" type="button" class="primary">Allow camera and start</button>
+          <p id="camera-msg" class="feedback" role="status" aria-live="polite">The camera is off.</p>
+        </div>
+      </section>
 
-    <section class="card practice" aria-labelledby="area-title">
-      <h2 id="area-title">Practice area</h2>
-      <p>
-        Reading on a screen can be tiring, especially with long lines and small text. Point two fingers at
-        any line of this paragraph and it turns black on yellow, so your eyes always know where they are.
-        Then give a thumbs up and the line is read out loud, with each word lighting up as you hear it.
-        Move to the next line whenever you're ready. If something is too small, pinch, hold, and lift your
-        hand to make the page bigger.
-      </p>
-      <div class="demo-row">
-        <a href="#practice-title" id="demo-link">Read about the gestures</a>
-        <button id="demo-button" type="button" class="demo-button">Click me</button>
-        <span id="demo-result" role="status" aria-live="polite"></span>
+      <!-- 1: point -->
+      <section class="panel" data-step="1" data-event="point" aria-labelledby="panel-title-1" hidden>
+        <div class="art" aria-hidden="true"><span>☝️</span></div>
+        <div class="body">
+          <h2 id="panel-title-1" tabindex="-1">Point to move the cursor</h2>
+          <ol class="how">
+            <li>Hold your hand up with your palm facing the screen.</li>
+            <li>Raise <strong>only your index finger</strong>. Curl the other fingers in.</li>
+            <li>Move your finger around. The arrow cursor follows it.</li>
+          </ol>
+          <p class="see"><strong>You'll see:</strong> an arrow with a blue "☝️ Point" badge.</p>
+          <p class="tip"><strong>Tip:</strong> you don't have to stretch to reach the screen edges. Small moves go a long way.</p>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 2: highlight -->
+      <section class="panel" data-step="2" data-event="highlight" aria-labelledby="panel-title-2" hidden>
+        <div class="art" aria-hidden="true"><span>✌️</span></div>
+        <div class="body">
+          <h2 id="panel-title-2" tabindex="-1">Two fingers to highlight</h2>
+          <ol class="how">
+            <li>Raise your <strong>index and middle fingers</strong> together, like a peace sign.</li>
+            <li>Move over a line in the text below. That line turns black on yellow.</li>
+            <li>Now move over the link or the button. Only that part is highlighted.</li>
+          </ol>
+          <p class="see"><strong>You'll see:</strong> a yellow frame with a tag saying "Line", "Link" or "Button".</p>
+          <p class="tip"><strong>Tip:</strong> lower your middle finger to go back to plain pointing.</p>
+          <div class="practice">
+            <p>Reading on a screen can be tiring, especially with long lines and small text. Point two fingers at any
+              line of this paragraph and it turns black on yellow, so your eyes always know where they are. Move down
+              one line at a time whenever you are ready.</p>
+            <p><a href="#panel-title-2" class="demo-link">A link to try</a> <button type="button" class="demo-chip">A button to try</button></p>
+          </div>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 3: read -->
+      <section class="panel" data-step="3" data-event="read" aria-labelledby="panel-title-3" hidden>
+        <div class="art" aria-hidden="true"><span>👍</span></div>
+        <div class="body">
+          <h2 id="panel-title-3" tabindex="-1">Thumbs up to read out loud</h2>
+          <ol class="how">
+            <li>Highlight a line below with <strong>two fingers</strong> and hold still for a moment.</li>
+            <li>Make a fist with your <strong>thumb pointing up</strong>, and hold it for about half a second.</li>
+            <li>Listen. It reads to the end of the paragraph, scrolling as it goes, and each word lights up orange.</li>
+          </ol>
+          <p class="see"><strong>To stop:</strong> thumbs up again, press <kbd>Esc</kbd>, or wave. Thumbs up once more to continue from the same line.</p>
+          <p class="tip"><strong>Tip:</strong> change the reading speed in the extension's popup.</p>
+          <div class="practice">
+            <p>Wavy was made for people who find reading on a screen hard. The highlight keeps your place, the voice
+              reads with you, and the orange word shows exactly where the voice is. You can stop at any moment and pick
+              up again from the same line, so you never lose your place.</p>
+          </div>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 4: click -->
+      <section class="panel" data-step="4" data-event="demo-click" aria-labelledby="panel-title-4" hidden>
+        <div class="art" aria-hidden="true"><span>🤏</span></div>
+        <div class="body">
+          <h2 id="panel-title-4" tabindex="-1">Pinch to click</h2>
+          <ol class="how">
+            <li>Point with <strong>one finger</strong> at the big "Click me" button below.</li>
+            <li>Touch your <strong>thumb and index fingertip together</strong>, then let go quickly.</li>
+            <li>The button says "Clicked!".</li>
+          </ol>
+          <p class="see"><strong>You'll see:</strong> a ring fills around the cursor while you pinch. Let go before it's full to click.</p>
+          <p class="tip"><strong>Tip:</strong> a fist or a thumbs up never clicks, so reading can't click by accident.</p>
+          <div class="practice center">
+            <button id="demo-button" type="button" class="demo-button">Click me</button>
+            <p id="demo-result" class="demo-result" role="status" aria-live="polite"></p>
+          </div>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 5: zoom -->
+      <section class="panel" data-step="5" data-event="zoom" aria-labelledby="panel-title-5" hidden>
+        <div class="art" aria-hidden="true"><span>🔍</span></div>
+        <div class="body">
+          <h2 id="panel-title-5" tabindex="-1">Pinch, hold and move to zoom</h2>
+          <ol class="how">
+            <li><strong>Pinch and keep holding</strong> until the ring around the cursor is full.</li>
+            <li>Move your hand <strong>up to zoom in</strong> or <strong>down to zoom out</strong>.</li>
+            <li>Let go to keep that size. It goes from 50% to 300%.</li>
+          </ol>
+          <p class="see"><strong>You'll see:</strong> a purple badge with the zoom level, like "🔍 150%".</p>
+          <p class="tip"><strong>Tip:</strong> press <kbd>Ctrl</kbd>+<kbd>0</kbd> (<kbd>⌘</kbd>+<kbd>0</kbd> on a Mac) to go back to 100%.</p>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 6: scroll -->
+      <section class="panel" data-step="6" data-event="scroll" aria-labelledby="panel-title-6" hidden>
+        <div class="art" aria-hidden="true"><span>🖐️</span></div>
+        <div class="body">
+          <h2 id="panel-title-6" tabindex="-1">Open palm to scroll</h2>
+          <ol class="how">
+            <li>Point at the box below, then <strong>open your hand</strong> with all fingers up.</li>
+            <li>Move it <strong>slowly up or down</strong>. The text moves with your hand, like sliding a sheet of paper.</li>
+            <li>Close your hand to stop. It glides a little, then stops.</li>
+          </ol>
+          <p class="see"><strong>You'll see:</strong> a teal "🖐️ Scroll" badge.</p>
+          <p class="tip"><strong>Tip:</strong> scrolling the wrong way for you? Turn on "Reverse scroll direction" in the popup.</p>
+          <div class="practice scroll-box" tabindex="0" role="region" aria-label="Scrolling practice text">
+            <p><strong>1.</strong> Move your open hand up, and this text slides up too.</p>
+            <p><strong>2.</strong> Keep going: more lines appear from the bottom.</p>
+            <p><strong>3.</strong> Move your hand down to bring the first lines back.</p>
+            <p><strong>4.</strong> Slow, smooth moves work best.</p>
+            <p><strong>5.</strong> Sideways movement doesn't scroll. That's saved for waving.</p>
+            <p><strong>6.</strong> When you close your hand, the page glides for a moment and stops.</p>
+            <p><strong>7.</strong> Almost there.</p>
+            <p><strong>8.</strong> You reached the end. 🎉</p>
+          </div>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 7: wave -->
+      <section class="panel" data-step="7" data-event="wake" aria-labelledby="panel-title-7" hidden>
+        <div class="art" aria-hidden="true"><span>👋</span></div>
+        <div class="body">
+          <h2 id="panel-title-7" tabindex="-1">Wave to pause and resume</h2>
+          <ol class="how">
+            <li>Open your hand, all fingers up.</li>
+            <li><strong>Wave side to side</strong> two or three times. The badge says "💤 Sleeping" and gestures stop.</li>
+            <li><strong>Wave again</strong> to wake Wavy up.</li>
+          </ol>
+          <p class="see"><strong>Why:</strong> so you can talk with your hands, drink or stretch without clicking things.</p>
+          <p class="tip"><strong>Tip:</strong> <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> does the same from the keyboard.</p>
+          <p class="feedback">Waiting for you to try it…</p>
+        </div>
+      </section>
+
+      <!-- 8: done -->
+      <section class="panel done" data-step="8" aria-labelledby="panel-title-8" hidden>
+        <div class="art" aria-hidden="true"><span>🎉</span></div>
+        <div class="body">
+          <h2 id="panel-title-8" tabindex="-1">You're all set!</h2>
+          <p>Wavy now works on every website. Here's everything on one card:</p>
+          <ul class="summary">
+            <li><span aria-hidden="true">☝️</span> One finger: move the cursor</li>
+            <li><span aria-hidden="true">✌️</span> Two fingers: highlight a line, link or button</li>
+            <li><span aria-hidden="true">👍</span> Thumbs up: read out loud (again to stop)</li>
+            <li><span aria-hidden="true">🤏</span> Quick pinch: click</li>
+            <li><span aria-hidden="true">🔍</span> Pinch, hold, up or down: zoom</li>
+            <li><span aria-hidden="true">🖐️</span> Open palm up or down: scroll</li>
+            <li><span aria-hidden="true">👋</span> Wave: pause or resume</li>
+          </ul>
+          <h3>Prefer the keyboard?</h3>
+          <dl class="keys">
+            <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></dt><dd>Start or stop hand tracking</dd>
+            <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Read the highlighted line, or the line under the mouse</dd>
+            <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></dt><dd>Pause or resume gestures</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Stop reading</dd>
+          </dl>
+          <p>Click Wavy's icon in the toolbar any time to start or stop it, change the reading speed, or give
+            yourself more time for each gesture.</p>
+        </div>
+      </section>
+
+      <div class="nav-row">
+        <button id="back" type="button" class="secondary">← Back</button>
+        <button id="next" type="button" class="primary">Next →</button>
       </div>
-    </section>
-
-    <section class="card done" id="all-done" hidden aria-labelledby="done-title" tabindex="-1">
-      <h2 id="done-title"><span aria-hidden="true">🎉</span> You're all set!</h2>
-      <p>Reading Line now works on every website. Click the extension's icon any time to start or stop it,
-        change the reading speed, or make the gesture timing more relaxed.</p>
-    </section>
-
-    <section class="card" aria-labelledby="keys-title">
-      <h2 id="keys-title">Prefer the keyboard?</h2>
-      <dl class="keys">
-        <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></dt><dd>Start or stop hand tracking</dd>
-        <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Read the highlighted line, or the line under the mouse</dd>
-        <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></dt><dd>Pause or resume gestures</dd>
-      </dl>
-    </section>
-    <div class="spacer" aria-hidden="true">Keep scrolling to practice 🖐️</div>
-  </main>
+    </main>
+  </div>
 
   <script src="gestures.js"></script>
   <script src="content.js"></script>

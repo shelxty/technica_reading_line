@@ -1,4 +1,4 @@
-# Reading Line v2: read the web with your hands
+# Wavy: read the web with your hands
 
 A Chrome extension (also Edge and Brave) that follows your hand with your webcam.
 
@@ -28,7 +28,9 @@ to read just one line.
 
 1. Open `chrome://extensions` and turn on **Developer mode** (top right).
 2. Click **Load unpacked** and choose this `extension_v2` folder.
-3. The tutorial opens. Click **Allow camera and start**, then try each gesture. The cards tick themselves off.
+3. The step-by-step tutorial opens. It turns on the camera, then teaches one gesture per step: numbered
+   instructions, what you'll see, a tip, and a practice area. Each step celebrates when it sees you do the
+   gesture. You can go Back, Skip, or jump to any step from the list on the left.
 4. Later, click the extension's icon to start / stop it and change settings.
 
 If you also have the first version (`extension/`) loaded, turn it off so they don't both use the camera.
@@ -94,7 +96,11 @@ specialist, including testing with screen readers such as NVDA, JAWS and VoiceOv
 | `background.js` | starts / stops the hidden page, forwards hand points to the tab you're on, zooms, reads out loud with `chrome.tts` (which reports each word), keyboard shortcuts |
 | `gestures.js` | pose detection, steadying the cursor (One Euro filter), wave, drag scroll. No browser code, so it's unit tested |
 | `content.js` | runs in each page: the gesture rules, cursor, highlight, word-by-word reading, the hand panel |
-| `popup.*`, `tutorial.*` | the settings popup and the first-run tutorial |
+| `popup.*`, `tutorial.*` | the settings popup and the step-by-step tutorial |
+
+The cursor follows your index fingertip on every frame while it's up, like `hand_cursor1.py`, whatever the
+other fingers do. A finger counts as up when its tip is above its middle joint (the same test as
+`hand_cursor1.py`), with a small dead band so a half-bent finger doesn't flicker between ☝️ and ✌️.
 
 Pages Chrome doesn't let extensions touch (`chrome://`, the Chrome Web Store) can't be controlled.
 
