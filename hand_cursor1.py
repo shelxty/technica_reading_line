@@ -182,10 +182,11 @@ root.withdraw()
 label = tk.Label(root, borderwidth = 0, padx = 0, pady = 0) # label to display the line img
 label.pack() 
 root.update()
-hwnd = ctypes.windll.user32.GetParent(root.winfo_id()) # get native window handle
+hwnd = ctypes.windll.user32.GetAncestor(root.winfo_id(), 2) # get native window handle
 style = ctypes.windll.user32.GetWindowLongW(hwnd, -20) # get window style
 
 ctypes.windll.user32.SetWindowLongW(hwnd, -20, style | 0x80000 | 0x20 | 0x80) # add click-through + no taskbar icon so that clicks can pass through to whats underneath OR ELSE YK OTHERWISE WE CANT DO ANYTHING WHILE ANYTHING'S HIGHLIGHTED
+ctypes.windll.user32.SetLayeredWindowAttributes(hwnd, 0, 255, 0x2) 
 
 line_box = None # screen rectangle; none means there's no hihglight currently 
 
@@ -342,22 +343,26 @@ try:
                 else:
                     two_start = None 
                     two_fired = False
-                    status = "No hand"
+                    # status = "No hand"
+            else: 
+                status = "No hand"
+                two_start = None 
+                two_fired = False 
 
 
-                root.update() # lets tkinter process events & redraw overlay each frame
-                cv2.putText(frame, status + (" | HL on" if highlight_on else " | HL off "), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2) # display the status on the preview window in cyan, size 0.8
-                cv2.imshow(WINDOW, frame) # show the webcam feed with the skeleton and status text
+            root.update() # lets tkinter process events & redraw overlay each frame
+            cv2.putText(frame, status + (" | HL on" if highlight_on else " | HL off "), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2) # display the status on the preview window in cyan, size 0.8
+            cv2.imshow(WINDOW, frame) # show the webcam feed with the skeleton and status text
 
-                key = cv2.waitKey(1) & 0xFF # process window events and get the key pressed
-                if key in (ord('q'), 27): # if 'q' or ESC is pressed, exit the loop
-                    break
-                # if key == ord("h"): # toggling h toggles highlight feature; flip setting if turning it off and remove overlays and visible highlights
-                #     highlight_on = not highlight_on 
-                #     if not highlight_on: 
-                #         hide_overlay()
-                if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
-                    break # if u click the "X" on the window then it closes too (woah! really?? no idea!!)
+            key = cv2.waitKey(1) & 0xFF # process window events and get the key pressed
+            if key in (ord('q'), 27): # if 'q' or ESC is pressed, exit the loop
+                break
+            # if key == ord("h"): # toggling h toggles highlight feature; flip setting if turning it off and remove overlays and visible highlights
+            #     highlight_on = not highlight_on 
+            #     if not highlight_on: 
+            #         hide_overlay()
+            if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
+                break # if u click the "X" on the window then it closes too (woah! really?? no idea!!)
 
 finally:
     if zoom_level > 0: 
