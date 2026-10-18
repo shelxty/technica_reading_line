@@ -64,12 +64,13 @@ FG_COLOR = (0, 0, 0) # new high contrast text color (black)
 
 TWO_FINGER_HOLD = 0.8 
 
-SCROLL_GAIN = 6000 # scrolls + closing/waving; this converts hand movement per frame into a scroll amount 
+SCROLL_GAIN = 8000 # scrolls + closing/waving; this converts hand movement per frame into a scroll amount 
 # ^ 120 = one mouse-wheel notch, so higher value means faster scrolling
 SCROLL_DEADZONE = 0.004 # ignore vertical movement smaller than this frame so that not everything triggers scrolling
 WAVE_WINDOW = 1.5 # how many seconds of hand movement history that is examined when ur looking for a wave
 WAVE_AMP = 0.07 # this is how far the hand must swing (denoted as a fraction of the screen width) in a direction to count as a swing 
 WAVE_SWINGS = 4 # num of swings to count as a wave. one swing is right to left, or left to right. thus, this is two "full waves" ifykwim
+WAKE_COOLDOWN = 1.5 # waving should turn on/off a sleep mode, which has a cooldown of 1.5 seconds 
 
 
 
@@ -286,6 +287,9 @@ scroll_prev_y = None # palm height on the previous frame; if this is set to None
 scroll_prev_x = None # i implore you to guess what this could possibly mean
 wave_samples = deque() # recent (time, x) palm positions that are used to detect a wave 
 
+asleep = False 
+last_toggle = 0.0 # time of last sleep. this is zero because i've never slept in my life!
+
 
 cap = cv2.VideoCapture(0) # open the webcam
 start = time.time() # timestamp for FPS calculation for MediaPipe's timestamps
@@ -304,8 +308,28 @@ try:
 
             ts = int((time.time() - start) * 1000) # timestamp in milliseconds
             result = landmarker.detect_for_video(mp_image, ts) # run the model on the frame
+            hands_found = result.hand_landmarks 
+            if asleep: 
+                now_s = time.time() # current time
+                if hands_found: 
+                    h0 = hands_found[0] # if hands found, look at its 21 landmarks
+                    draw_landmarks(frame, h0) # keep drawing skeleton so that it's evident the program is still tracking everything
+                    if four_finger_pose(h0): # when asleep, nothing works except for waving again to reactivate everything
+                        wave_samples.append((now_s, h0[9].x)) # record palm x position w/ timestamp 
+                        while wave_samples and now_s - wave_samples[0][0] > WAVE_WINDOW: 
+                            wave_samples.popleft() # removeo ldest sample
+                        if is_wave(wave_samples) and now_s - last_toggle > WAKE_COOLDOWN:
+                            asleep = False # omg. ur awake. you've been in a coma for the last 20 years. please, please, let me start from the beginning now...
+                            last_toggle = now_s 
+                            wave_samples.clear() # discrd wave so no re-triggering
+                    else: 
+                        wave_samples.clear() # wave must happen in the open hand pose 
+                else: 
+                    wave_samples.clear() # and discrad any partial wave
+                hands_found = []
 
-            if result.hand_landmarks: # only act if hand = detected 
+            # if result.hand_landmarks: # only act if hand = detected 
+            if hands_found:
                 hand = result.hand_landmarks[0]
                 draw_landmarks(frame, hand) #self-explanatory
                 now = time.time() # what is the time.time now??
@@ -405,8 +429,18 @@ try:
                     while wave_samples and now - wave_samples[0][0] > WAVE_WINDOW: # drop samples older than the window 
                         wave_samples.popleft()
                     if is_wave(wave_samples): 
-                        status = "Wave: closing" # leave main loop
-                        break 
+                        # status = "Wave: closing" # leave main loop
+                        # break 
+                        if is_wave(wave_samples) and now - last_toggle > WAKE_COOLDOWN: 
+                            asleep = True 
+                            last_toggle = now # start cooldown of 1.5s
+                            wave_samples.clear() 
+                            scroll_prev_y = None # cancel any scroll that's in progress
+                            scroll_prev_x = None 
+                            two_start = None 
+                            two_fired = False 
+                            hide_overlay() 
+                            status = "Sleeping"
                 else: 
                     scroll_prev_y = None 
                     scroll_prev_x = None 
@@ -415,7 +449,8 @@ try:
 
 
             else: 
-                status = "No hand"
+                # status = "No hand"
+                status = "Sleeping (wave to wake)" if asleep else "No hand"
                 two_start = None 
                 two_fired = False 
 
