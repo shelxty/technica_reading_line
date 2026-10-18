@@ -3,8 +3,11 @@
 Point at text with your finger (via webcam) to highlight the line you're reading,
 pinch to click, pinch-and-hold to zoom.
 
-There are three versions:
+There are four versions:
 
+- **`extension_v2/`**: the newest Chrome extension: point, highlight, read aloud word by word, palm scroll,
+  pinch to click and zoom, wave to pause, a first-run tutorial, and Section 508 / WCAG 2.0 AA accessibility.
+  See [extension_v2/README.md](extension_v2/README.md).
 - **`windows_app/`**: the Windows desktop app (newest). Works over any app on your screen.
 - **`extension/`**: a Chrome extension (also works in Edge / Brave). Works on macOS, Windows and Linux.
 - **`hand_cursor1.py`**: the original Windows-only desktop script.

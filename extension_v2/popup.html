@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reading Line</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="brand">
+    <img src="icons/icon48.png" alt="" width="36" height="36">
+    <div>
+      <h1>Reading Line</h1>
+      <p class="sub">Read the web with your hands</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="status-card" aria-labelledby="state">
+      <div class="state-row">
+        <span class="dot" aria-hidden="true"></span>
+        <p id="state" class="state" role="status" aria-live="polite">Hand tracking is off</p>
+      </div>
+      <button id="toggle" class="primary" type="button">Start hand tracking</button>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+
+    <section aria-labelledby="gestures-title">
+      <h2 id="gestures-title">Gestures</h2>
+      <ul class="gestures">
+        <li><span class="emoji" aria-hidden="true">☝️</span><span><strong>One finger</strong> moves the cursor</span></li>
+        <li><span class="emoji" aria-hidden="true">✌️</span><span><strong>Two fingers</strong> highlight a line, link or button</span></li>
+        <li><span class="emoji" aria-hidden="true">👍</span><span><strong>Thumbs up</strong> reads from the highlighted line to the end of the paragraph. Thumbs up again (or <kbd>Esc</kbd>) stops</span></li>
+        <li><span class="emoji" aria-hidden="true">🖐️</span><span><strong>Open palm</strong> up or down scrolls the page</span></li>
+        <li><span class="emoji" aria-hidden="true">🤏</span><span><strong>Pinch</strong> to click. Pinch and hold, then move up or down to zoom</span></li>
+        <li><span class="emoji" aria-hidden="true">👋</span><span><strong>Wave</strong> to pause gestures, wave again to resume</span></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <div class="switches">
+        <button type="button" role="switch" class="switch" data-key="soundOn" aria-checked="true">
+          <span class="label">Sound cues</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+        </button>
+        <button type="button" role="switch" class="switch" data-key="readParagraph" aria-checked="true">
+          <span class="label">Keep reading to the end of the paragraph</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+        </button>
+        <button type="button" role="switch" class="switch" data-key="wordByWord" aria-checked="true">
+          <span class="label">Highlight each word while reading</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+        </button>
+        <button type="button" role="switch" class="switch" data-key="sayKind" aria-checked="true">
+          <span class="label">Say "link" or "button" after a name</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+        </button>
+        <button type="button" role="switch" class="switch" data-key="showPreview" aria-checked="true">
+          <span class="label">Show hand preview on pages</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+        </button>
+        <button type="button" role="switch" class="switch" data-key="invertScroll" aria-checked="false">
+          <span class="label">Reverse scroll direction</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+        </button>
+      </div>
+
+      <div class="field">
+        <label for="voiceRate">Reading speed</label>
+        <input id="voiceRate" type="range" min="0.5" max="2" step="0.1" data-key="voiceRate" aria-describedby="voiceRateOut">
+        <output id="voiceRateOut" for="voiceRate">1.0×</output>
+      </div>
+      <div class="field">
+        <label for="cursorSize">Cursor size</label>
+        <input id="cursorSize" type="range" min="0.75" max="2.5" step="0.25" data-key="cursorSize" aria-describedby="cursorSizeOut">
+        <output id="cursorSizeOut" for="cursorSize">1.0×</output>
+      </div>
+      <div class="field">
+        <label for="holdScale">Gesture timing</label>
+        <select id="holdScale" data-key="holdScale" aria-describedby="holdHelp">
+          <option value="1">Normal</option>
+          <option value="1.5">Relaxed (holds take 1.5× longer)</option>
+          <option value="2">Extra relaxed (holds take 2× longer)</option>
+        </select>
+      </div>
+      <p id="holdHelp" class="help">More time for pinch-and-hold, thumbs up and clicks.</p>
+    </section>
+  </main>
+
+  <footer>
+    <button id="tutorial" type="button" class="secondary">Open the tutorial</button>
+    <details>
+      <summary>Keyboard shortcuts</summary>
+      <dl class="keys">
+        <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></dt><dd>Start or stop hand tracking</dd>
+        <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Read the highlighted line, or the line under the mouse</dd>
+        <dt><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></dt><dd>Pause or resume gestures</dd>
+      </dl>
+      <button id="shortcuts" type="button" class="link">Change shortcuts</button>
+    </details>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>
