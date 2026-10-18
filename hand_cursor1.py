@@ -1,3 +1,16 @@
+""" 
+
+before running, in the terminal, run
+
+pip install opencv-python mediapipe numpy pyautogui
+
+and then, you can just run 
+python hand_cursor1.py
+
+in the terminal again obv 
+
+"""
+
 import time # timestamps 
 import math 
 import urllib.request # for downloading the model
