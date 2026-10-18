@@ -30,6 +30,9 @@ venv\Scripts\activate
 python reading_line.py
 ```
 
+Links, buttons and tabs are found through Windows' accessibility info (UI Automation, the same thing
+screen readers use). If you set the app up before this was added, run `pip install -r requirements.txt` again.
+
 A preview window with your webcam shows up. Click on it once so it gets your key presses.
 You can resize it to make its text bigger.
 
@@ -37,8 +40,8 @@ You can resize it to make its text bigger.
 
 | Gesture | What it does |
 | --- | --- |
-| Point with your index finger | moves the mouse. The line of text under it is highlighted black on yellow |
-| Thumbs up, hold for half a second | reads the line your finger last rested on, out loud. That line stays highlighted until it's finished |
+| Point with your index finger | moves the mouse. The line of text under it is highlighted black on yellow. On a link, button, tab, menu item, checkbox or text field, just that element is highlighted |
+| Thumbs up, hold for half a second | reads the line (or link / button / tab) your finger last rested on, out loud. It stays highlighted until it's finished. Links and buttons are read by their name and type, like a screen reader: "Contact us, link" |
 | Open palm (four fingers up), then move it up / down | scroll. The further you move, the faster |
 | Quick pinch (thumb + index) | click |
 | Pinch and hold, then move your hand up / down | zoom in / out, from 50% to 300% |
@@ -68,11 +71,13 @@ Settings are saved in `windows_app/settings.json`. Close the app before editing 
 | `responsive` | how fast the cursor catches up when you move. Higher = less lag |
 | `still_px` | wobbles smaller than this many pixels are ignored |
 | `scroll_speed` / `scroll_max` | how fast scrolling speeds up, and its top speed (wheel notches per second) |
+| `components` | `false` = always highlight whole lines, even on links and buttons |
+| `say_kind` | `false` = read just a link's / button's name, without "link" / "button" |
 | `rest_time` | how long your finger has to rest on a line before thumbs-up reads that line (seconds) |
 | `curl_ratio` | how much the index finger has to bend before the cursor holds still (for thumbs-up) |
 | `read_hold`, `hold_time`, `palm_enter`, `click_confirm` | how long each gesture has to be held |
 
-Also: pinch sensitivity, zoom range, preview text size, spoken announcements.
+Also: pinch sensitivity, zoom range, preview text size.
 
 ### Accessibility (Section 508 / WCAG 2.0 AA)
 
@@ -89,7 +94,7 @@ What the app does to meet the WCAG 2.0 AA criteria that apply to it:
 | 2.2.2 Pause, stop, hide | `s` stops reading, `Space` pauses everything, `h` hides the highlight |
 | 2.3.1 Three flashes | Nothing flashes. The highlight only moves when your finger moves to another line, and it's far smaller than the WCAG flash area |
 | 3.3.1 Error identification | Problems are shown in words in the preview, for example "No OCR: pip install winocr" or "No text here" |
-| 4.1.3 Status messages (WCAG 2.1) | Changes are also spoken ("Zoom 150 percent", "Paused", "No text here"). Turn off with `announce` |
+| 4.1.3 Status messages (WCAG 2.1) | Changes ("Zoom 150%", "PAUSED", "No text here") show as text in the preview window. The voice is only used to read lines |
 
 This is a self-check, not a formal audit. Official Section 508 conformance needs testing by an accessibility
 reviewer with assistive technology (for example the NVDA or JAWS screen readers).

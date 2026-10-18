@@ -5,3 +5,4 @@ pyautogui
 pillow
 pywin32
 winocr
+uiautomation

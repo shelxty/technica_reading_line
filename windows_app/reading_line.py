@@ -40,9 +40,11 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 from PIL import Image, ImageGrab
 
+import elements
 import gestures
 import settings as settings_file
 from linefinder import BLACK, BORDER, YELLOW, find_line_in_gray, line_extent, render_highlight
+from elements import Component
 from overlays import HighlightOverlay
 from speech import Reader
 
@@ -105,17 +107,14 @@ overlay = HighlightOverlay()
 reader = Reader(S.ocr_lang, S.voice_rate)
 
 
-def announce(text):
-    # spoken feedback, so you don't have to look at the preview window to know what happened
-    if S.announce:
-        reader.say(text)
-
-
 # ---------- highlight ----------
 
-line_box = None  # screen rectangle of the line under the finger; None = no text there
-overlay_box = None  # the line the highlight is currently drawn on
-read_box = None  # the line being read aloud (highlight stays locked on it until the voice is done)
+# what's under the finger: a Component - either a line of text (kind "line") or a link / button /
+# tab... (found through Windows' accessibility info). None = nothing there
+target = None
+last_component_check = 0.0
+overlay_box = None  # the box the highlight is currently drawn on
+read_box = None  # the box being read aloud (highlight stays locked on it until the voice is done)
 stable = gestures.StableLine(S.rest_time)
 
 
@@ -171,19 +170,38 @@ def show_box(box):
     return Image.fromarray(region[y0:y1, x0:x1])
 
 
+def target_at(cx, cy):
+    """the link / button / tab under (cx, cy) if there is one, otherwise the line of text"""
+    comp = elements.component_at(cx, cy, SCREEN_W, SCREEN_H) if S.components else None
+    if comp:
+        return comp
+    if overlay.visible:
+        hide_highlight()  # hide so the screenshot doesn't capture it
+        time.sleep(0.03)
+    box = find_line(cx, cy)
+    return Component(box, "line", "") if box else None
+
+
 def update_line(cx, cy, now):
-    """finds the line under the finger, highlights it (if highlight is on) and remembers
-    which line you've rested on (for read aloud)"""
-    global line_box
-    if not inside(line_box, cx, cy):
-        if overlay.visible:
-            hide_highlight()  # hide so the screenshot doesn't capture it
-            time.sleep(0.03)
-        line_box = find_line(cx, cy)
-    stable.update(line_box, now)
-    if line_box and S.highlight:
-        if overlay_box != line_box:
-            show_box(line_box)
+    """finds what's under the finger (a link / button / tab, or a line of text), highlights it
+    (if highlight is on) and remembers what you've rested on (for read aloud)"""
+    global target, last_component_check
+    on_target = target is not None and inside(target.box, cx, cy)
+    # inside a line, still check every so often whether you've moved onto a link in that line
+    recheck_line = (on_target and target.kind == "line" and S.components
+                    and now - last_component_check >= 0.1)
+    if not on_target:
+        last_component_check = now
+        target = target_at(cx, cy)
+    elif recheck_line:
+        last_component_check = now
+        comp = elements.component_at(cx, cy, SCREEN_W, SCREEN_H)
+        if comp:
+            target = comp
+    stable.update(target, now)
+    if target and S.highlight:
+        if overlay_box != target.box:
+            show_box(target.box)
     elif overlay.visible:
         hide_highlight()
 
@@ -195,39 +213,42 @@ def hide_highlight():
 
 
 def forget_line():
-    global line_box
-    line_box = None
+    global target
+    target = None
     hide_highlight()
 
 
 def content_moved():
-    # after scrolling / zooming the text is somewhere else, so forget every remembered line
+    # after scrolling / zooming the text is somewhere else, so forget everything remembered
     global read_box
     forget_line()
     stable.reset()
     read_box = None
 
 
-def read_box_aloud(box):
-    """highlights the line and reads it. the highlight stays on it until the voice is done"""
+def read_aloud(t):
+    """highlights the line / link / button and reads it. the highlight stays on it until the voice is done.
+    links, buttons, tabs... are read by their real name (plus what they are, like a screen reader);
+    lines of text are read from the screen"""
     global read_box
-    if box is None:
-        announce("No text here")
+    if t is None:
         return "No text here"
-    read_box = box
-    reader.read_image(show_box(box))
+    read_box = t.box
+    img = show_box(t.box)
+    if t.kind != "line" and t.name:
+        reader.read_text(f"{t.name}, {t.kind}" if S.say_kind else t.name)
+    else:
+        reader.read_image(img)
     return "Reading aloud"
 
 
-def line_to_read(x, y):
-    # the line you rested on, if there is one; otherwise whatever is under (x, y)
+def target_to_read(x, y):
+    # what you rested on, if anything; otherwise whatever is under (x, y)
     if stable.stable is not None:
         return stable.stable
-    if inside(line_box, x, y):
-        return line_box
-    hide_highlight()
-    time.sleep(0.03)
-    return find_line(x, y)
+    if target is not None and inside(target.box, x, y):
+        return target
+    return target_at(x, y)
 
 
 # ---------- zoom (ctrl + mouse wheel, like ctrl + / ctrl - in browsers, Word, PDF readers...) ----------
@@ -321,7 +342,7 @@ scroll_acc = 0.0  # leftover fraction of a mouse-wheel notch
 thumb_start = None
 thumb_fired = False
 thumb_point = (sx, sy)
-thumb_box = None
+thumb_target = None
 
 cap = cv2.VideoCapture(0)
 cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)  # resizable, so you can make the text bigger
@@ -475,11 +496,9 @@ try:
                         direction = 1 if dy > 0 else -1
                         if zoom_by(direction):
                             status = f"Zoom {ZOOM_LEVELS[zoom_index]}%"
-                            announce(f"Zoom {ZOOM_LEVELS[zoom_index]} percent")
                         else:
                             limit = "maximum" if direction > 0 else "minimum"
                             status = f"Zoom {ZOOM_LEVELS[zoom_index]}% ({limit})"
-                            announce(f"{limit} zoom")
 
                 if pinching and ratio > S.pinch_exit:
                     pinching = False
@@ -493,12 +512,12 @@ try:
                         thumb_start = now
                         # making the thumbs-up moved your fingertip, so read the line you rested on before
                         thumb_point = (sx, sy) if curl_frozen else point_before(now, S.lookback_s)
-                        thumb_box = line_to_read(*thumb_point)
-                        if thumb_box and not reader.busy:
-                            show_box(thumb_box)  # shows which line is about to be read
+                        thumb_target = target_to_read(*thumb_point)
+                        if thumb_target and not reader.busy:
+                            show_box(thumb_target.box)  # shows what is about to be read
                     elif not thumb_fired and now - thumb_start >= S.read_hold:
                         thumb_fired = True
-                        status = read_box_aloud(thumb_box)
+                        status = read_aloud(thumb_target)
                     if not thumb_fired:
                         status = f"Thumbs up: reading in {max(0.0, S.read_hold - (now - thumb_start)):.1f}s"
                 else:
@@ -518,6 +537,10 @@ try:
             mode = (f"Highlight {'on' if S.highlight else 'off'}   Zoom {ZOOM_LEVELS[zoom_index]}%   "
                     f"{pose_info}")
             top_lines = [(status, YELLOW_BGR), (mode, WHITE_BGR)]
+            if target is not None and target.kind != "line":
+                top_lines.append((f"On {target.kind}: {target.name[:40]}", WHITE_BGR))
+            if S.components and not elements.available():
+                top_lines.append(("Links/buttons: pip install uiautomation", ORANGE_BGR))
             if reader.status:
                 top_lines.append((reader.status, ORANGE_BGR))
             draw_text_block(frame, top_lines, 0)
@@ -532,21 +555,18 @@ try:
                 pinching = scrolling = False
                 pending_click = None
                 content_moved()
-                announce("Paused" if paused else "Resumed")
             elif key == ord("h"):
                 S.highlight = not S.highlight
                 settings_file.save(S)
                 forget_line()
-                announce(f"Highlight {'on' if S.highlight else 'off'}")
             elif key == ord("t"):
-                status = read_box_aloud(line_box if inside(line_box, sx, sy) else line_to_read(sx, sy))
+                status = read_aloud(target if target and inside(target.box, sx, sy) else target_to_read(sx, sy))
             elif key == ord("s"):
                 reader.stop_speaking()
             elif key in (ord("-"), ord("=")):
                 S.voice_rate = min(10, max(-10, S.voice_rate + (1 if key == ord("=") else -1)))
                 reader.set_rate(S.voice_rate)
                 settings_file.save(S)
-                announce(f"Voice speed {S.voice_rate}")
 
             if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                 break  # closed with the X button

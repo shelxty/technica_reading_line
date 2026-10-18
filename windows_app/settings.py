@@ -27,6 +27,7 @@ DEFAULTS = {
 
     # highlight (black text on yellow)
     "highlight": True,
+    "components": True,  # on links, buttons, tabs... highlight just that, not the whole line
     "region_w": 900,  # width of the area around the finger used to find which line it's on
     "search_h": 40,  # px above/below the fingertip to search for text
     "snap": 12,  # snap to text within this many px if the fingertip is between lines
@@ -36,10 +37,10 @@ DEFAULTS = {
 
     # thumbs up = read aloud
     "read_hold": 0.5,  # seconds to hold a thumbs-up before it reads
+    "say_kind": True,  # when reading a link / button / tab, also say what it is ("Home, link")
     "rest_time": 0.4,  # a line counts as "the one you're reading" after your finger rests on it this long
     "voice_rate": 0,  # -10 (slow) .. 10 (fast)
     "ocr_lang": "en",
-    "announce": True,  # say changes out loud too ("zoom 150 percent", "paused"...)
 
     # open palm = scroll
     "palm_enter": 0.25,  # hold an open palm this long to start scrolling

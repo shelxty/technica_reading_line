@@ -31,9 +31,15 @@ class Reader:
         self.busy = True
         self._q.put(img)
 
-    def say(self, text):
-        # short spoken announcement ("zoom 150 percent"). cuts off whatever was being said
-        self._q.put(("say", text))
+    def read_text(self, text):
+        # read text we already know (the name of a link / button), no OCR needed
+        while not self._q.empty():
+            try:
+                self._q.get_nowait()
+            except queue.Empty:
+                break
+        self.busy = True
+        self._q.put(("text", text))
 
     def stop_speaking(self):
         self.busy = False
@@ -109,17 +115,15 @@ class Reader:
                 else:
                     voice.Rate = self.rate
                 continue
-            if isinstance(item, tuple):  # short announcement, cuts off reading
-                voice.Speak(item[1], SPEAK_ASYNC | PURGE)
-                reading_since = None
-                self.busy = False
-                continue
-            try:
-                text = self._ocr(item, loop)
-            except Exception as e:  # noqa: BLE001
-                self.status = "OCR failed"
-                print("OCR failed:", e)
-                text = ""
+            if isinstance(item, tuple):  # ("text", already known text)
+                text = item[1]
+            else:
+                try:
+                    text = self._ocr(item, loop)
+                except Exception as e:  # noqa: BLE001
+                    self.status = "OCR failed"
+                    print("OCR failed:", e)
+                    text = ""
             self.last_text = text
             if text:
                 self.status = ""

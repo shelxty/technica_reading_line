@@ -388,3 +388,86 @@ def test_no_text_found_is_not_busy():
     r.read_image(Image.new("RGB", (10, 10)))
     assert wait_until(lambda: not r.busy)
     r.close()
+
+
+def test_reads_a_known_name_without_ocr():
+    r = make_reader(talk_time=0.3, text="should not be used")
+    r.read_text("Contact us, link")
+    assert r.busy
+    assert wait_until(lambda: not r.busy)
+    assert r.fake.spoken == ["Contact us, link"]
+    r.close()
+
+
+# ---------- links / buttons / tabs (Windows UI Automation, faked here) ----------
+
+import elements  # noqa: E402
+
+SCREEN = (1920, 1080)
+
+
+class FakeRect:
+    def __init__(self, left, top, right, bottom):
+        self.left, self.top, self.right, self.bottom = left, top, right, bottom
+
+
+class FakeControl:
+    def __init__(self, type_name, rect, name="", parent=None):
+        self.ControlTypeName = type_name
+        self.BoundingRectangle = FakeRect(*rect)
+        self.Name = name
+        self.parent = parent
+
+    def GetParentControl(self):  # noqa: N802 - uiautomation's name
+        return self.parent
+
+
+class FakeAuto:
+    def __init__(self, control):
+        self.control = control
+
+    def ControlFromPoint(self, x, y):  # noqa: N802
+        return self.control
+
+
+def test_text_inside_a_link_highlights_the_link(monkeypatch):
+    page = FakeControl("DocumentControl", (0, 0, 1920, 1080))
+    link = FakeControl("HyperlinkControl", (200, 100, 320, 122), "Contact  us", page)
+    text = FakeControl("TextControl", (202, 102, 318, 120), "Contact us", link)
+    monkeypatch.setattr(elements, "auto", FakeAuto(text))
+    comp = elements.component_at(250, 110, *SCREEN)
+    assert comp == elements.Component((200, 100, 320, 122), "link", "Contact us")
+
+
+def test_tab_and_button(monkeypatch):
+    tab = FakeControl("TabItemControl", (0, 0, 240, 36), "Inbox")
+    monkeypatch.setattr(elements, "auto", FakeAuto(tab))
+    assert elements.component_at(100, 20, *SCREEN).kind == "tab"
+    button = FakeControl("ButtonControl", (500, 500, 600, 540), "Save")
+    monkeypatch.setattr(elements, "auto", FakeAuto(button))
+    assert elements.component_at(550, 520, *SCREEN).name == "Save"
+
+
+def test_plain_text_is_not_a_component(monkeypatch):
+    page = FakeControl("DocumentControl", (0, 0, 1920, 1080))
+    paragraph = FakeControl("TextControl", (100, 100, 900, 300), "Some paragraph", page)
+    monkeypatch.setattr(elements, "auto", FakeAuto(paragraph))
+    assert elements.component_at(300, 200, *SCREEN) is None
+
+
+def test_huge_clickable_card_falls_back_to_lines(monkeypatch):
+    card = FakeControl("HyperlinkControl", (0, 0, 1200, 800), "Whole article card")
+    monkeypatch.setattr(elements, "auto", FakeAuto(card))
+    assert elements.component_at(300, 200, *SCREEN) is None
+
+
+def test_without_uiautomation_it_just_highlights_lines(monkeypatch):
+    monkeypatch.setattr(elements, "auto", None)
+    assert elements.component_at(300, 200, *SCREEN) is None
+    assert not elements.available()
+
+
+def test_component_box_must_be_under_the_cursor():
+    assert elements.is_component_box((10, 10, 100, 40), 50, 20, *SCREEN)
+    assert not elements.is_component_box((10, 10, 100, 40), 500, 20, *SCREEN)
+    assert not elements.is_component_box((10, 10, 12, 40), 11, 20, *SCREEN)  # too thin
