@@ -4,6 +4,7 @@
 import asyncio
 import queue
 import threading
+import time
 
 from PIL import Image
 
@@ -14,6 +15,9 @@ class Reader:
         self.rate = rate
         self.status = ""  # shown in the preview window if something is missing
         self.last_text = ""
+        # True from the moment you ask for a line to be read until the voice has finished it
+        # (or it was stopped / there was no text). the app keeps that line highlighted meanwhile
+        self.busy = False
         self._q = queue.Queue()
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -24,6 +28,7 @@ class Reader:
                 self._q.get_nowait()
             except queue.Empty:
                 break
+        self.busy = True
         self._q.put(img)
 
     def say(self, text):
@@ -31,6 +36,7 @@ class Reader:
         self._q.put(("say", text))
 
     def stop_speaking(self):
+        self.busy = False
         self._q.put("stop")
 
     def set_rate(self, rate):
@@ -60,43 +66,65 @@ class Reader:
             self.status = "No OCR: pip install winocr"
             return ""
 
-    def _run(self):
-        voice = None
+    def _make_voice(self):
         try:
             import pythoncom
             import win32com.client
             pythoncom.CoInitializeEx(pythoncom.COINIT_MULTITHREADED)
             voice = win32com.client.Dispatch("SAPI.SpVoice")
             voice.Rate = self.rate
+            return voice
         except Exception as e:  # noqa: BLE001 - any failure just means no voice
             self.status = "No voice: pip install pywin32"
             print("text-to-speech unavailable:", e)
+            return None
+
+    def _run(self):
+        voice = self._make_voice()
 
         SPEAK_ASYNC, PURGE = 1, 2  # don't block, and cut off whatever was being said
         loop = asyncio.new_event_loop()
+        reading_since = None  # when we started speaking the current line
         while True:
-            item = self._q.get()
+            try:
+                item = self._q.get(timeout=0.1)
+            except queue.Empty:
+                # finished reading the line? (give the voice a moment to actually start first)
+                if (reading_since is not None and time.time() - reading_since > 0.3
+                        and voice.WaitUntilDone(0)):
+                    reading_since = None
+                    if self._q.empty():
+                        self.busy = False
+                continue
             if item is None:
                 break
             if voice is None:
+                self.busy = False
                 continue
-            if item == "stop":
-                voice.Speak("", SPEAK_ASYNC | PURGE)
+            if isinstance(item, str):  # "stop" or "rate"
+                if item == "stop":
+                    voice.Speak("", SPEAK_ASYNC | PURGE)
+                    reading_since = None
+                    self.busy = False
+                else:
+                    voice.Rate = self.rate
                 continue
-            if item == "rate":
-                voice.Rate = self.rate
-                continue
-            if isinstance(item, tuple):
+            if isinstance(item, tuple):  # short announcement, cuts off reading
                 voice.Speak(item[1], SPEAK_ASYNC | PURGE)
+                reading_since = None
+                self.busy = False
                 continue
             try:
                 text = self._ocr(item, loop)
             except Exception as e:  # noqa: BLE001
                 self.status = "OCR failed"
                 print("OCR failed:", e)
-                continue
+                text = ""
             self.last_text = text
             if text:
                 self.status = ""
                 voice.Speak(text, SPEAK_ASYNC | PURGE)
+                reading_since = time.time()
+            elif self._q.empty():
+                self.busy = False
         loop.close()

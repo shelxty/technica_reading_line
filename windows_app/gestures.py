@@ -129,3 +129,25 @@ BROWSER_ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200,
 
 def zoom_levels(lowest, highest):
     return [z for z in BROWSER_ZOOM_LEVELS if lowest <= z <= highest]
+
+
+class StableLine:
+    """remembers the last line your finger rested on for at least `hold` seconds.
+    making a thumbs-up moves your fingertip across other lines for a moment, but it doesn't
+    stay on them long enough to count, so the line you meant is the one that gets read"""
+
+    def __init__(self, hold=0.4):
+        self.hold = hold
+        self.reset()
+
+    def reset(self):
+        self.current = None  # line under the finger right now
+        self.since = 0.0  # when the finger got onto it
+        self.stable = None  # last line that was held long enough
+
+    def update(self, box, now):
+        if box != self.current:
+            self.current = box
+            self.since = now
+        if box is not None and now - self.since >= self.hold:
+            self.stable = box

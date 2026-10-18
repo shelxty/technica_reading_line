@@ -253,3 +253,108 @@ def test_old_settings_are_dropped(tmp_path, monkeypatch):
     assert "ruler_on" not in s and "scroll_notches" not in s  # old settings are ignored
     assert s.scroll_speed == settings.DEFAULTS["scroll_speed"]  # so the new slower default applies
     assert s.steady == 0.8  # current settings are kept
+
+
+# ---------- which line gets read ----------
+
+LINE_A = (0, 100, 800, 120)
+LINE_B = (0, 125, 800, 145)
+
+
+def test_reads_the_line_you_rested_on_not_the_one_you_passed():
+    st = gestures.StableLine(hold=0.4)
+    for i in range(20):  # rest on line A for 0.66 s
+        st.update(LINE_A, i / 30)
+    t = 20 / 30
+    for i in range(6):  # making the thumbs-up drags the finger across line B for 0.2 s
+        st.update(LINE_B, t + i / 30)
+    assert st.stable == LINE_A
+
+
+def test_resting_on_a_new_line_switches_to_it():
+    st = gestures.StableLine(hold=0.4)
+    st.update(LINE_A, 0.0)
+    st.update(LINE_A, 0.5)
+    st.update(LINE_B, 0.6)
+    st.update(LINE_B, 1.1)
+    assert st.stable == LINE_B
+
+
+def test_stable_line_forgotten_after_reset():
+    st = gestures.StableLine(hold=0.4)
+    st.update(LINE_A, 0.0)
+    st.update(LINE_A, 0.5)
+    st.reset()
+    assert st.stable is None
+
+
+# ---------- read aloud keeps "busy" until the voice is done ----------
+
+import time  # noqa: E402
+
+import speech  # noqa: E402
+
+
+class FakeVoice:
+    def __init__(self, talk_time):
+        self.talk_time = talk_time
+        self.spoken = []
+        self.started = 0.0
+        self.Rate = 0
+
+    def Speak(self, text, flags):  # noqa: N802 - SAPI's name
+        self.spoken.append(text)
+        self.started = time.time()
+
+    def WaitUntilDone(self, ms):  # noqa: N802
+        return time.time() - self.started >= self.talk_time
+
+
+def make_reader(talk_time=0.6, text="hello world"):
+    class TestReader(speech.Reader):
+        def _make_voice(self):
+            self.fake = FakeVoice(talk_time)
+            return self.fake
+
+        def _ocr(self, img, loop):
+            return text
+
+    r = TestReader()
+    time.sleep(0.05)
+    return r
+
+
+def wait_until(cond, timeout=3.0):
+    end = time.time() + timeout
+    while time.time() < end:
+        if cond():
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def test_busy_while_reading_then_free():
+    r = make_reader(talk_time=0.6)
+    r.read_image(Image.new("RGB", (10, 10)))
+    assert r.busy
+    time.sleep(0.4)
+    assert r.busy  # still talking
+    assert wait_until(lambda: not r.busy)
+    assert r.fake.spoken == ["hello world"]
+    r.close()
+
+
+def test_stop_frees_immediately():
+    r = make_reader(talk_time=5)
+    r.read_image(Image.new("RGB", (10, 10)))
+    assert wait_until(lambda: r.fake.spoken)
+    r.stop_speaking()
+    assert not r.busy
+    r.close()
+
+
+def test_no_text_found_is_not_busy():
+    r = make_reader(text="")
+    r.read_image(Image.new("RGB", (10, 10)))
+    assert wait_until(lambda: not r.busy)
+    r.close()

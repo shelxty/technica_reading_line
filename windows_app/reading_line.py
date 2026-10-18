@@ -113,7 +113,10 @@ def announce(text):
 
 # ---------- highlight ----------
 
-line_box = None  # screen rectangle of the highlighted line; None = nothing highlighted
+line_box = None  # screen rectangle of the line under the finger; None = no text there
+overlay_box = None  # the line the highlight is currently drawn on
+read_box = None  # the line being read aloud (highlight stays locked on it until the voice is done)
+stable = gestures.StableLine(S.rest_time)
 
 
 def grab(box):
@@ -150,34 +153,75 @@ def inside(box, x, y):
     return box is not None and box[0] <= x <= box[2] and box[1] <= y <= box[3]
 
 
-def update_highlight(cx, cy):
+def show_box(box):
+    """highlights `box` (black on yellow). returns the plain screenshot of that line"""
+    global overlay_box
+    if overlay.visible:
+        overlay.hide()  # hide so the screenshot doesn't capture it
+        time.sleep(0.03)
+    img = grab(box)
+    overlay.show(high_contrast(np.array(img.convert("RGB")), YELLOW, BLACK), box)
+    overlay_box = box
+    return img
+
+
+def update_line(cx, cy, now):
+    """finds the line under the finger, highlights it (if highlight is on) and remembers
+    which line you've rested on (for read aloud)"""
     global line_box
-    if inside(line_box, cx, cy):
-        return  # still on the same line, do nothing
-    overlay.hide()  # hide so the screenshot doesn't capture it
-    time.sleep(0.03)
-    line_box = find_line(cx, cy)
-    if line_box:
-        overlay.show(high_contrast(np.array(grab(line_box).convert("RGB")), YELLOW, BLACK), line_box)
+    if not inside(line_box, cx, cy):
+        if overlay.visible:
+            hide_highlight()  # hide so the screenshot doesn't capture it
+            time.sleep(0.03)
+        line_box = find_line(cx, cy)
+    stable.update(line_box, now)
+    if line_box and S.highlight:
+        if overlay_box != line_box:
+            show_box(line_box)
+    elif overlay.visible:
+        hide_highlight()
+
+
+def hide_highlight():
+    global overlay_box
+    overlay.hide()
+    overlay_box = None
 
 
 def forget_line():
     global line_box
     line_box = None
-    overlay.hide()
+    hide_highlight()
 
 
-def read_line_at(x, y):
-    box = line_box if inside(line_box, x, y) else None
-    if box is None:
-        forget_line()
-        time.sleep(0.03)
-        box = find_line(x, y)
+def content_moved():
+    # after scrolling / zooming the text is somewhere else, so forget every remembered line
+    global read_box
+    forget_line()
+    stable.reset()
+    read_box = None
+
+
+def read_box_aloud(box):
+    """highlights the line and reads it. the highlight stays on it until the voice is done"""
+    global read_box
     if box is None:
         announce("No text here")
         return "No text here"
-    reader.read_image(grab(box))
+    read_box = box
+    reader.read_image(show_box(box))
     return "Reading aloud"
+
+
+def line_to_read(x, y):
+    # the line you rested on, if there is one; otherwise whatever is under (x, y)
+    if stable.stable is not None:
+        return stable.stable
+    if inside(line_box, x, y):
+        return line_box
+    hide_highlight()
+    time.sleep(0.03)
+    return find_line(x, y)
 
 
 # ---------- zoom (ctrl + mouse wheel, like ctrl + / ctrl - in browsers, Word, PDF readers...) ----------
@@ -199,7 +243,7 @@ def zoom_by(direction):
     finally:
         pyautogui.keyUp("ctrl")
     zoom_index = new
-    forget_line()  # the text moved
+    content_moved()
     return True
 
 
@@ -271,6 +315,7 @@ scroll_acc = 0.0  # leftover fraction of a mouse-wheel notch
 thumb_start = None
 thumb_fired = False
 thumb_point = (sx, sy)
+thumb_box = None
 
 cap = cv2.VideoCapture(0)
 cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)  # resizable, so you can make the text bigger
@@ -330,7 +375,7 @@ try:
                         scrolling = True
                         scroll_anchor = hand[9].y  # middle of the palm is the steadiest point
                         scroll_acc = 0.0
-                        forget_line()
+                        content_moved()
                 elif scrolling:
                     if palm_lost is None:
                         palm_lost = now
@@ -381,8 +426,8 @@ try:
                     history.append((now, sx, sy))
                     pyautogui.moveTo(*clamp_to_screen(sx, sy))
                     status = "Pointing"
-                    if S.highlight:
-                        update_highlight(sx, sy)
+                    if not reader.busy:
+                        update_line(sx, sy, now)
 
                 # --- pinch = click, pinch + hold + move = zoom ---
                 # making a thumbs-up drags the index finger past the thumb, which looks like a pinch.
@@ -440,16 +485,26 @@ try:
                 if thumbs and not scrolling:
                     if thumb_start is None:
                         thumb_start = now
-                        # curling the index finger drags the cursor down, so use where it was a few frames ago
+                        # making the thumbs-up moved your fingertip, so read the line you rested on before
                         thumb_point = (sx, sy) if curl_frozen else point_before(now, S.lookback_s)
+                        thumb_box = line_to_read(*thumb_point)
+                        if thumb_box and not reader.busy:
+                            show_box(thumb_box)  # shows which line is about to be read
                     elif not thumb_fired and now - thumb_start >= S.read_hold:
                         thumb_fired = True
-                        status = read_line_at(*thumb_point)
+                        status = read_box_aloud(thumb_box)
                     if not thumb_fired:
                         status = f"Thumbs up: reading in {max(0.0, S.read_hold - (now - thumb_start)):.1f}s"
                 else:
                     thumb_start = None
                     thumb_fired = False
+
+            # done reading? let the highlight follow your finger again
+            if read_box is not None and not reader.busy:
+                read_box = None
+                forget_line()
+            if read_box is not None and not paused:
+                status = "Reading aloud" + (f": {reader.last_text[:40]}..." if reader.last_text else "")
 
             overlay.update()  # let tkinter redraw the highlight
 
@@ -470,7 +525,7 @@ try:
                 paused = not paused
                 pinching = scrolling = False
                 pending_click = None
-                forget_line()
+                content_moved()
                 announce("Paused" if paused else "Resumed")
             elif key == ord("h"):
                 S.highlight = not S.highlight
@@ -478,7 +533,7 @@ try:
                 forget_line()
                 announce(f"Highlight {'on' if S.highlight else 'off'}")
             elif key == ord("t"):
-                status = read_line_at(sx, sy)
+                status = read_box_aloud(line_box if inside(line_box, sx, sy) else line_to_read(sx, sy))
             elif key == ord("s"):
                 reader.stop_speaking()
             elif key in (ord("-"), ord("=")):

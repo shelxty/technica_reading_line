@@ -38,7 +38,7 @@ You can resize it to make its text bigger.
 | Gesture | What it does |
 | --- | --- |
 | Point with your index finger | moves the mouse. The line of text under it is highlighted black on yellow |
-| Thumbs up, hold for half a second | reads the highlighted line out loud |
+| Thumbs up, hold for half a second | reads the line your finger last rested on, out loud. That line stays highlighted until it's finished |
 | Open palm (four fingers up), then move it up / down | scroll. The further you move, the faster |
 | Quick pinch (thumb + index) | click |
 | Pinch and hold, then move your hand up / down | zoom in / out, from 50% to 300% |
@@ -68,6 +68,7 @@ Settings are saved in `windows_app/settings.json`. Close the app before editing 
 | `responsive` | how fast the cursor catches up when you move. Higher = less lag |
 | `still_px` | wobbles smaller than this many pixels are ignored |
 | `scroll_speed` / `scroll_max` | how fast scrolling speeds up, and its top speed (wheel notches per second) |
+| `rest_time` | how long your finger has to rest on a line before thumbs-up reads that line (seconds) |
 | `curl_ratio` | how much the index finger has to bend before the cursor holds still (for thumbs-up) |
 | `read_hold`, `hold_time`, `palm_enter`, `click_confirm` | how long each gesture has to be held |
 

@@ -36,6 +36,7 @@ DEFAULTS = {
 
     # thumbs up = read aloud
     "read_hold": 0.5,  # seconds to hold a thumbs-up before it reads
+    "rest_time": 0.4,  # a line counts as "the one you're reading" after your finger rests on it this long
     "voice_rate": 0,  # -10 (slow) .. 10 (fast)
     "ocr_lang": "en",
     "announce": True,  # say changes out loud too ("zoom 150 percent", "paused"...)
