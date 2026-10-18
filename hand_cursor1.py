@@ -67,10 +67,11 @@ TWO_FINGER_HOLD = 0.8
 SCROLL_GAIN = 8000 # scrolls + closing/waving; this converts hand movement per frame into a scroll amount 
 # ^ 120 = one mouse-wheel notch, so higher value means faster scrolling
 SCROLL_DEADZONE = 0.004 # ignore vertical movement smaller than this frame so that not everything triggers scrolling
-WAVE_WINDOW = 1.5 # how many seconds of hand movement history that is examined when ur looking for a wave
-WAVE_AMP = 0.07 # this is how far the hand must swing (denoted as a fraction of the screen width) in a direction to count as a swing 
-WAVE_SWINGS = 4 # num of swings to count as a wave. one swing is right to left, or left to right. thus, this is two "full waves" ifykwim
+WAVE_WINDOW = 2 # how many seconds of hand movement history that is examined when ur looking for a wave
+WAVE_AMP = 0.05 # this is how far the hand must swing (denoted as a fraction of the screen width) in a direction to count as a swing 
+WAVE_SWINGS = 3 # num of swings to count as a wave. one swing is right to left, or left to right. thus, this is two "full waves" ifykwim
 WAKE_COOLDOWN = 1.5 # waving should turn on/off a sleep mode, which has a cooldown of 1.5 seconds 
+WAVE_GRACE = 0.4
 
 
 
@@ -122,12 +123,25 @@ def two_finger_pose(hand): # this is only for index + middle finger, not for ind
         and not finger_up(hand, 16, 14)
         and not finger_up(hand, 20, 18))
 
+def finger_open(hand, tip, pip): # test to see if fingers are extended
+    wx, wy = hand[0].x, hand[0].y # wrist position 
+    d_tip = math.hypot(hand[tip].x - wx, hand[tip].y - wy) # wrist-to-fingertip distance 
+    d_pip = math.hypot(hand[pip].x - wx, hand[pip].y - wy) # wrist-to-middle-joint distance
+    return d_tip > d_pip # extended fingers reach farther from the wrist than their joint, however the hand is tilted
+
 def four_finger_pose(hand): 
-    return (finger_up(hand, 8, 6) 
-        and finger_up(hand, 12, 10)
-        and finger_up(hand, 16, 14)
-        and finger_up(hand, 20, 18))
+    return (finger_open(hand, 8, 6) 
+        and finger_open(hand, 12, 10)
+        and finger_open(hand, 16, 14)
+        and finger_open(hand, 20, 18))
         # see how this four finger pose differs from the two finger pose by using "and" and not "and not"? woahhh that's the difference isnt it so cool ikr ur so cool, reader <3   
+
+def hand_x(hand): # horizontal position used for wave detection
+    return (hand[8].x + hand[12].x + hand[16].x + hand[20].x / 4) # fingertips swing more than knuckles generally. but nothing's gonna stop me from swinging a fist at ur face <3 
+
+def expire_wave(t): # after the pose has been gone for wave_grace seconds, wave history is cleared!
+    if t - last_open_t > WAVE_GRACE: 
+        wave_samples.clear() 
 
 def is_wave(samples): 
     if len(samples) < 2: # if not enough data, no wave
@@ -289,6 +303,7 @@ wave_samples = deque() # recent (time, x) palm positions that are used to detect
 
 asleep = False 
 last_toggle = 0.0 # time of last sleep. this is zero because i've never slept in my life!
+last_open_t = 0.0
 
 
 cap = cv2.VideoCapture(0) # open the webcam
@@ -315,7 +330,9 @@ try:
                     h0 = hands_found[0] # if hands found, look at its 21 landmarks
                     draw_landmarks(frame, h0) # keep drawing skeleton so that it's evident the program is still tracking everything
                     if four_finger_pose(h0): # when asleep, nothing works except for waving again to reactivate everything
-                        wave_samples.append((now_s, h0[9].x)) # record palm x position w/ timestamp 
+                        last_open_t = now_s # open hand is visible
+                        wave_samples.append((now_s, hand_x(h0))) # uses fingertip avg
+                        # wave_samples.append((now_s, h0[9].x)) # record palm x position w/ timestamp 
                         while wave_samples and now_s - wave_samples[0][0] > WAVE_WINDOW: 
                             wave_samples.popleft() # removeo ldest sample
                         if is_wave(wave_samples) and now_s - last_toggle > WAKE_COOLDOWN:
@@ -323,9 +340,11 @@ try:
                             last_toggle = now_s 
                             wave_samples.clear() # discrd wave so no re-triggering
                     else: 
-                        wave_samples.clear() # wave must happen in the open hand pose 
+                        # wave_samples.clear() # wave must happen in the open hand pose 
+                        expire_wave(now_s)
                 else: 
-                    wave_samples.clear() # and discrad any partial wave
+                    # wave_samples.clear() # and discrad any partial wave
+                    expire_wave(now_s)
                 hands_found = []
 
             # if result.hand_landmarks: # only act if hand = detected 
@@ -419,12 +438,14 @@ try:
                     if scroll_prev_y is not None: # when u have a previous frame to compare to... then 
                         d = scroll_prev_y - py # positive = hand moved up 
                         dx = px - scroll_prev_x # horizontal movement
-                        if abs(d) > SCROLL_DEADZONE and abs(d) > abs(dx): # when there's more vertical movement than horizontal movement (we cant have waving scroll stuff LOL)
+                        if abs(d) > SCROLL_DEADZONE and abs(d) > 2 * abs(dx): # when there's more vertical movement than horizontal movement (we cant have waving scroll stuff LOL)
                             pyautogui.scroll(int(d * SCROLL_GAIN))
                             status = "Scroll up" if d > 0 else "Scroll down"
                     scroll_prev_y = py # remember frame's height 
                     scroll_prev_x = px # and also remember frame's horizontal position for next time
-                    wave_samples.append((now, px))
+                    last_open_t = now
+                    wave_samples.append((now, hand_x(hand)))
+                    # wave_samples.append((now, px))
 
                     while wave_samples and now - wave_samples[0][0] > WAVE_WINDOW: # drop samples older than the window 
                         wave_samples.popleft()
@@ -444,7 +465,8 @@ try:
                 else: 
                     scroll_prev_y = None 
                     scroll_prev_x = None 
-                    wave_samples.clear() 
+                    # wave_samples.clear() 
+                    expire_wave(now)
 
 
 
@@ -456,7 +478,9 @@ try:
 
                 scroll_prev_y = None 
                 scroll_prev_x = None 
-                wave_samples.clear() 
+                # wave_samples.clear() 
+                if not asleep: 
+                    expire_wave(time.time())
 
 
             root.update() # lets tkinter process events & redraw overlay each frame
