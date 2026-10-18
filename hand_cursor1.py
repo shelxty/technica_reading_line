@@ -62,6 +62,8 @@ PAD = 3 # extra pixels of padding around highlighted line
 BG_COLOR = (255, 255, 0) # new high contrast bg color (yellow)
 FG_COLOR = (0, 0, 0) # new high contrast text color (black)
 
+TWO_FINGER_HOLD = 0.8 
+
 
 pyautogui.PAUSE = 0 # usually pyautogui has a 0.1s delay after every action but this eliminates that
 SCREEN_W, SCREEN_H = pyautogui.size() # get the screen res in pixels
@@ -100,6 +102,16 @@ def pinch_ratio(hand):
     palm_size = math.hypot(hand[0].x - hand[9].x, 
                             hand[0].y - hand[9].y) # distance between wrist and middle finger base
     return gap / palm_size if palm_size > 0 else 1.0 # divide by palm size means that moving further or closer to the screen doesn't matter 
+
+
+def finger_up(hand, tip, pip): 
+    return hand[tip].y < hand[pip].y
+
+def two_finger_pose(hand): # this is only for index + middle finger, not for index + ring or pinky or anything else ykykyk
+    return (finger_up(hand, 8, 6) 
+        and finger_up(hand, 12, 10)
+        and not finger_up(hand, 16, 14)
+        and not finger_up(hand, 20, 18))
 
 
 def find_line(cx, cy): # line detection 
@@ -227,7 +239,10 @@ anchor_y = 0.0
 zoom_level = 0 
 frozen = (sx, sy) # cursor position when zooming started
 status = "Move your hand"
-highlight_on = True
+
+highlight_on = False # highlight changes to start off; turn it on with ur pose 
+two_start = None 
+two_fired = False
 
 cap = cv2.VideoCapture(0) # open the webcam
 start = time.time() # timestamp for FPS calculation for MediaPipe's timestamps
@@ -311,7 +326,22 @@ try:
                     else: 
                         status = "Zoom set" # zoom gesture ended so there's no click
                     history.clear() 
-                else: 
+
+                if not pinching and two_finger_pose(hand):
+                    if two_start is None: 
+                        two_start = now 
+                    elif not two_fired and (now - two_start) >= TWO_FINGER_HOLD: 
+                        highlight_on = not highlight_on 
+                        two_fired = True 
+                        if not highlight_on: 
+                            hide_overlay() 
+                    if not two_fired: 
+                        status = f"Hold... {int((now - two_start) / TWO_FINGER_HOLD * 100)}%"
+                    else: 
+                        status = "Highlight ON" if highlight_on else "Highlight OFF"
+                else:
+                    two_start = None 
+                    two_fired = False
                     status = "No hand"
 
 
@@ -322,10 +352,10 @@ try:
                 key = cv2.waitKey(1) & 0xFF # process window events and get the key pressed
                 if key in (ord('q'), 27): # if 'q' or ESC is pressed, exit the loop
                     break
-                if key == ord("h"): # toggling h toggles highlight feature; flip setting if turning it off and remove overlays and visible highlights
-                    highlight_on = not highlight_on 
-                    if not highlight_on: 
-                        hide_overlay()
+                # if key == ord("h"): # toggling h toggles highlight feature; flip setting if turning it off and remove overlays and visible highlights
+                #     highlight_on = not highlight_on 
+                #     if not highlight_on: 
+                #         hide_overlay()
                 if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                     break # if u click the "X" on the window then it closes too (woah! really?? no idea!!)
 
