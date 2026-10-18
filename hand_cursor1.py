@@ -64,6 +64,14 @@ FG_COLOR = (0, 0, 0) # new high contrast text color (black)
 
 TWO_FINGER_HOLD = 0.8 
 
+SCROLL_GAIN = 6000 # scrolls + closing/waving; this converts hand movement per frame into a scroll amount 
+# ^ 120 = one mouse-wheel notch, so higher value means faster scrolling
+SCROLL_DEADZONE = 0.004 # ignore vertical movement smaller than this frame so that not everything triggers scrolling
+WAVE_WINDOW = 1.5 # how many seconds of hand movement history that is examined when ur looking for a wave
+WAVE_AMP = 0.07 # this is how far the hand must swing (denoted as a fraction of the screen width) in a direction to count as a swing 
+WAVE_SWINGS = 4 # num of swings to count as a wave. one swing is right to left, or left to right. thus, this is two "full waves" ifykwim
+
+
 
 pyautogui.PAUSE = 0 # usually pyautogui has a 0.1s delay after every action but this eliminates that
 SCREEN_W, SCREEN_H = pyautogui.size() # get the screen res in pixels
@@ -112,6 +120,35 @@ def two_finger_pose(hand): # this is only for index + middle finger, not for ind
         and finger_up(hand, 12, 10)
         and not finger_up(hand, 16, 14)
         and not finger_up(hand, 20, 18))
+
+def four_finger_pose(hand): 
+    return (finger_up(hand, 8, 6) 
+        and finger_up(hand, 12, 10)
+        and finger_up(hand, 16, 14)
+        and finger_up(hand, 20, 18))
+        # see how this four finger pose differs from the two finger pose by using "and" and not "and not"? woahhh that's the difference isnt it so cool ikr ur so cool, reader <3   
+
+def is_wave(samples): 
+    if len(samples) < 2: # if not enough data, no wave
+        return False # balanced, as all things should be 
+    xs = [x for _, x in samples] # keep only horizontal positions
+    last = xs[0]
+    direction = 0 # 0 = unknown, 1 = moving right, -1 = moving left
+    swings = 0 # the number of swings only counts completd direction changes
+
+    for x in xs[1:]:
+        if direction != 1 and x - last > WAVE_AMP: # moved right by WAVE_AMP from last extreme
+            direction = 1 # heading right 
+            swings += 1
+            last = x  # reset extreme to here
+        elif direction != -1 and last - x > WAVE_AMP: 
+            direction = -1 # heading left aaaaaaaaaaaaaaaaaaaaaaaa
+            swings += 1 
+            last = x 
+        elif (direction == 1 and x > last) or (direction == -1 and x < last): # still traveling in same direction 
+            last = x # then extend the extreme slightly so that the small wobbles dont count in the tracking alksd;jfa;sldfja;lsdfkj
+    return swings >= WAVE_SWINGS # if there were enough alternating swings, a wave happened!!!!!!!! woah!!!!!!!!!!!!
+# reminds me of all the times i could barely wave to someone because of my social anxiety making me think no one was waving to me when they were.... oh well! we improve 
 
 
 def find_line(cx, cy): # line detection 
@@ -245,6 +282,11 @@ highlight_on = False # highlight changes to start off; turn it on with ur pose
 two_start = None 
 two_fired = False
 
+scroll_prev_y = None # palm height on the previous frame; if this is set to None, it means that we're not actively scrolling
+scroll_prev_x = None # i implore you to guess what this could possibly mean
+wave_samples = deque() # recent (time, x) palm positions that are used to detect a wave 
+
+
 cap = cv2.VideoCapture(0) # open the webcam
 start = time.time() # timestamp for FPS calculation for MediaPipe's timestamps
 WINDOW = "Hand_Cursor" # name of the window that will show the webcam feed (preview window)
@@ -268,8 +310,9 @@ try:
                 draw_landmarks(frame, hand) #self-explanatory
                 now = time.time() # what is the time.time now??
                 ratio = pinch_ratio(hand) # how closed ur hand is. how pinchy ur doing yes
+                four_pose = four_finger_pose(hand) 
 
-                if not pinching: # if ur not pinching, this controls cursor movement 
+                if not pinching and not four_pose: # if ur not pinching AS WELL AS not actively scrolling, this controls cursor movement 
                     tx, ty = to_screen(hand[8]) # get the screen coords of the index finger tip
                     sx = sx * SMOOTH + tx * (1 - SMOOTH) 
                     sy = sy * SMOOTH + ty * (1 - SMOOTH) 
@@ -344,10 +387,41 @@ try:
                     two_start = None 
                     two_fired = False
                     # status = "No hand"
+
+                if not pinching and four_pose: # if ur hand is open and it's not mid pinch
+                    hide_overlay()
+                    px, py = hand[9].x, hand[9].y # the middle finger knuckle is a steady palm position
+                    status = "Four fingers: scroll" # print this
+                    if scroll_prev_y is not None: # when u have a previous frame to compare to... then 
+                        d = scroll_prev_y - py # positive = hand moved up 
+                        dx = px - scroll_prev_x # horizontal movement
+                        if abs(d) > SCROLL_DEADZONE and abs(d) > abs(dx): # when there's more vertical movement than horizontal movement (we cant have waving scroll stuff LOL)
+                            pyautogui.scroll(int(d * SCROLL_GAIN))
+                            status = "Scroll up" if d > 0 else "Scroll down"
+                    scroll_prev_y = py # remember frame's height 
+                    scroll_prev_x = px # and also remember frame's horizontal position for next time
+                    wave_samples.append((now, px))
+
+                    while wave_samples and now - wave_samples[0][0] > WAVE_WINDOW: # drop samples older than the window 
+                        wave_samples.popleft()
+                    if is_wave(wave_samples): 
+                        status = "Wave: closing" # leave main loop
+                        break 
+                else: 
+                    scroll_prev_y = None 
+                    scroll_prev_x = None 
+                    wave_samples.clear() 
+
+
+
             else: 
                 status = "No hand"
                 two_start = None 
                 two_fired = False 
+
+                scroll_prev_y = None 
+                scroll_prev_x = None 
+                wave_samples.clear() 
 
 
             root.update() # lets tkinter process events & redraw overlay each frame
