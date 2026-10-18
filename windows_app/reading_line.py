@@ -20,6 +20,7 @@ keys (click on the preview window first so it gets the key presses):
 """
 
 import ctypes
+import math
 import os
 import time
 import urllib.request
@@ -235,7 +236,21 @@ options = vision.HandLandmarkerOptions(
 )
 
 sx, sy = SCREEN_W / 2, SCREEN_H / 2  # smoothed cursor position
-history = deque(maxlen=S.lookback)
+history = deque(maxlen=90)  # (time, x, y) of the cursor over the last ~3 seconds
+filter_x = gestures.OneEuro(S.steady, S.responsive)  # removes the jitter from the fingertip
+filter_y = gestures.OneEuro(S.steady, S.responsive)
+ext_ref = 0.0  # how long the index finger looks when it's straight (slowly adapts)
+curl_frozen = False  # True while the index finger is curling: cursor stays put
+
+
+def point_before(now, seconds):
+    """where the cursor was `seconds` ago. used when a pinch or curl starts, because bending the
+    finger drags the fingertip (and the cursor) away from what you were pointing at"""
+    for t, x, y in reversed(history):
+        if t <= now - seconds:
+            return x, y
+    return (history[0][1], history[0][2]) if history else (sx, sy)
+
 paused = False
 status = "Move your hand"
 
@@ -288,6 +303,10 @@ try:
             else:
                 hand = None
                 pose_info = "Hand: not seen"
+                filter_x.reset()
+                filter_y.reset()
+                ext_ref = 0.0
+                curl_frozen = False
 
             if paused:
                 status = "PAUSED - press space to resume"
@@ -323,7 +342,8 @@ try:
                     palm_start = None
 
                 if scrolling:
-                    v = gestures.scroll_velocity(scroll_anchor - hand[9].y, S.scroll_deadzone, S.scroll_notches)
+                    v = gestures.scroll_velocity(scroll_anchor - hand[9].y, S.scroll_deadzone, S.scroll_speed,
+                                                 S.scroll_max)
                     scroll_acc += v * dt
                     notches = int(scroll_acc)
                     if notches:
@@ -332,12 +352,33 @@ try:
                         scroll_acc -= notches
                     status = "Scrolling" + (" up" if v > 0 else " down" if v < 0 else ": move palm up or down")
 
+                # --- index finger curling (on the way to a thumbs-up or fist)? freeze the cursor ---
+                # the fingertip slides down while it bends, which used to drag the cursor and the
+                # highlight onto the lines below. so as soon as it starts bending, snap back to where
+                # you were pointing just before, and stay there until the finger straightens again
+                ext = gestures.index_extension(hand)
+                if not curl_frozen:
+                    ext_ref = max(ext, ext_ref * 0.995)  # slowly adapts if you change how you point
+                if not curl_frozen and not pinching and ext < S.curl_ratio * ext_ref:
+                    curl_frozen = True
+                    sx, sy = point_before(now, S.lookback_s)
+                    pyautogui.moveTo(*clamp_to_screen(sx, sy))
+                elif curl_frozen and ext >= (S.curl_ratio + 0.1) * ext_ref:
+                    curl_frozen = False
+                    filter_x.reset()  # carry on smoothly from where the cursor is now
+                    filter_y.reset()
+                    filter_x(sx, now)
+                    filter_y(sy, now)
+                if curl_frozen and not (pinching or scrolling or thumbs):
+                    status = "Holding position (finger bent)"
+
                 # --- pointing: move the cursor + highlight the line under it ---
-                if not (pinching or scrolling or palm or thumbs):
+                if not (pinching or scrolling or palm or thumbs or curl_frozen):
                     tx, ty = to_screen(hand[8])  # index fingertip
-                    sx = sx * S.smooth + tx * (1 - S.smooth)
-                    sy = sy * S.smooth + ty * (1 - S.smooth)
-                    history.append((sx, sy))
+                    nx, ny = filter_x(tx, now), filter_y(ty, now)
+                    if math.hypot(nx - sx, ny - sy) >= S.still_px:  # ignore tiny wobbles
+                        sx, sy = nx, ny
+                    history.append((now, sx, sy))
                     pyautogui.moveTo(*clamp_to_screen(sx, sy))
                     status = "Pointing"
                     if S.highlight:
@@ -368,7 +409,7 @@ try:
                     pinch_start = now
                     zoom_mode = False
                     # closing your fingers makes the fingertip drift, so use the position from a few frames ago
-                    frozen = history[0] if history else (sx, sy)
+                    frozen = (sx, sy) if curl_frozen else point_before(now, S.lookback_s)
                     pyautogui.moveTo(*clamp_to_screen(*frozen))
                     status = "Pinch"
                 elif pinching and not zoom_mode and now - pinch_start > S.hold_time:
@@ -400,7 +441,7 @@ try:
                     if thumb_start is None:
                         thumb_start = now
                         # curling the index finger drags the cursor down, so use where it was a few frames ago
-                        thumb_point = history[0] if history else frozen
+                        thumb_point = (sx, sy) if curl_frozen else point_before(now, S.lookback_s)
                     elif not thumb_fired and now - thumb_start >= S.read_hold:
                         thumb_fired = True
                         status = read_line_at(*thumb_point)

@@ -10,8 +10,11 @@ SETTINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settin
 DEFAULTS = {
     # cursor
     "margin": 0.15,  # ignore the outer 15% of the camera frame so you can reach the screen edges
-    "smooth": 0.8,  # cursor smoothing. higher = steadier but laggier
-    "lookback": 6,  # use the cursor position from this many frames ago when a pinch starts
+    "steady": 0.5,  # cursor steadiness when your finger is still. lower = steadier (try 0.3 - 1.5)
+    "responsive": 0.003,  # how quickly the cursor catches up when you move. higher = less lag
+    "still_px": 3,  # ignore wobbles smaller than this many pixels
+    "curl_ratio": 0.75,  # index finger bent to below this much of its full length = curling: freeze cursor
+    "lookback_s": 0.25,  # when a pinch / curl starts, jump back to where the cursor was this long ago
 
     # pinch = click, pinch + hold + move = zoom
     "pinch_enter": 0.25,  # pinch "closed" when thumb-index gap is below this fraction of palm size
@@ -40,7 +43,8 @@ DEFAULTS = {
     # open palm = scroll
     "palm_enter": 0.25,  # hold an open palm this long to start scrolling
     "scroll_deadzone": 0.03,  # how far (fraction of camera height) to move before scrolling starts
-    "scroll_notches": 60,  # scroll speed: mouse-wheel notches per second per unit of hand movement
+    "scroll_speed": 30,  # mouse-wheel notches per second per unit of hand movement. lower = slower
+    "scroll_max": 6,  # fastest scroll, in mouse-wheel notches per second
 
     # preview window
     "text_scale": 0.7,  # size of the text in the preview window

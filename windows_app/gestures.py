@@ -70,12 +70,57 @@ def thumbs_up_pose(hand):
     return folded and thumb_up
 
 
-def scroll_velocity(offset, deadzone, speed):
+def index_extension(hand):
+    # how stretched out the index finger is (tip to knuckle, divided by palm size).
+    # it drops as soon as you start curling the finger, e.g. on the way to a thumbs-up
+    palm = palm_size(hand)
+    return dist(hand[8], hand[5]) / palm if palm > 0 else 0.0
+
+
+def scroll_velocity(offset, deadzone, speed, max_speed=None):
     # joystick-style: the further your palm is from where it started, the faster it scrolls.
     # offset > 0 = hand moved up = scroll up. returns mouse-wheel notches per second
     if abs(offset) <= deadzone:
         return 0.0
-    return math.copysign((abs(offset) - deadzone) * speed, offset)
+    v = (abs(offset) - deadzone) * speed
+    if max_speed is not None:
+        v = min(v, max_speed)
+    return math.copysign(v, offset)
+
+
+class OneEuro:
+    """One Euro filter (Casiez et al. 2012): smooths a noisy value without making it laggy.
+    when the value barely moves it smooths a lot (no jitter), when it moves fast it smooths
+    a little (no lag). min_cutoff: lower = steadier when still. beta: higher = less lag when moving"""
+
+    def __init__(self, min_cutoff=0.5, beta=0.003, d_cutoff=1.0):
+        self.min_cutoff = min_cutoff
+        self.beta = beta
+        self.d_cutoff = d_cutoff
+        self.reset()
+
+    def reset(self):
+        self.x = None
+        self.dx = 0.0
+        self.t = None
+
+    @staticmethod
+    def _alpha(cutoff, dt):
+        tau = 1.0 / (2 * math.pi * cutoff)
+        return 1.0 / (1.0 + tau / dt)
+
+    def __call__(self, x, t):
+        if self.x is None:
+            self.x, self.t = x, t
+            return x
+        dt = max(t - self.t, 1e-3)
+        a_d = self._alpha(self.d_cutoff, dt)
+        self.dx = a_d * (x - self.x) / dt + (1 - a_d) * self.dx  # smoothed speed
+        cutoff = self.min_cutoff + self.beta * abs(self.dx)
+        a = self._alpha(cutoff, dt)
+        self.x = a * x + (1 - a) * self.x
+        self.t = t
+        return self.x
 
 
 # the zoom steps chrome and edge use for ctrl + mouse wheel

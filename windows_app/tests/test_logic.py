@@ -91,6 +91,41 @@ def test_scroll_deadzone_direction_and_speed():
     assert 3 <= gestures.scroll_velocity(0.1, 0.03, 60) <= 6
 
 
+def test_scroll_default_is_slower_and_capped():
+    d = settings.DEFAULTS
+    comfy = gestures.scroll_velocity(0.1, d["scroll_deadzone"], d["scroll_speed"], d["scroll_max"])
+    assert 1 <= comfy <= 3  # a comfortable hand movement: 1-3 notches per second
+    far = gestures.scroll_velocity(0.5, d["scroll_deadzone"], d["scroll_speed"], d["scroll_max"])
+    assert far == d["scroll_max"]  # never faster than the cap
+    assert gestures.scroll_velocity(-0.5, 0.03, 30, 6) == -6
+
+
+# ---------- steady cursor ----------
+
+def test_one_euro_removes_jitter_when_still():
+    import random
+    random.seed(1)
+    f = gestures.OneEuro(0.5, 0.003)
+    out = [f(500 + random.uniform(-8, 8), i / 30) for i in range(90)]  # finger "still" but noisy
+    assert max(out[30:]) - min(out[30:]) < 6  # raw noise spans 16px
+
+
+def test_one_euro_still_follows_real_movement():
+    f = gestures.OneEuro(0.5, 0.003)
+    for i in range(30):
+        f(100, i / 30)
+    x = 100
+    for i in range(30, 60):  # move 1000px in one second
+        x = f(100 + (i - 29) * 33.3, i / 30)
+    assert x > 700  # caught up most of the way, no big lag
+
+
+def test_index_extension_drops_when_curling():
+    straight = gestures.index_extension(make_hand(index=True, thumb="tucked"))
+    curled = gestures.index_extension(make_hand(index=False, thumb="up"))
+    assert curled < settings.DEFAULTS["curl_ratio"] * straight
+
+
 # ---------- zoom ----------
 
 def test_zoom_goes_from_50_to_300_percent():
@@ -212,8 +247,9 @@ def test_settings_round_trip(tmp_path, monkeypatch):
 
 def test_old_settings_are_dropped(tmp_path, monkeypatch):
     path = tmp_path / "settings.json"
-    path.write_text('{"ruler_on": true, "dwell_on": true, "smooth": 0.5}')
+    path.write_text('{"ruler_on": true, "scroll_notches": 60, "steady": 0.8}')
     monkeypatch.setattr(settings, "SETTINGS_PATH", str(path))
     s = settings.load()
-    assert "ruler_on" not in s and "dwell_on" not in s
-    assert s.smooth == 0.5
+    assert "ruler_on" not in s and "scroll_notches" not in s  # old settings are ignored
+    assert s.scroll_speed == settings.DEFAULTS["scroll_speed"]  # so the new slower default applies
+    assert s.steady == 0.8  # current settings are kept

@@ -60,8 +60,18 @@ The 50% to 300% steps are the ones Chrome and Edge use. When you quit, zoom goes
 The preview shows what the app is doing, the zoom level, and **`Hand:`**, the gesture it thinks you're
 making. If a gesture doesn't work, check that first.
 
-Settings are saved in `windows_app/settings.json`: smoothing, pinch sensitivity, how long each hold takes,
-scroll speed, zoom range, preview text size, spoken announcements. Close the app before editing it.
+Settings are saved in `windows_app/settings.json`. Close the app before editing it. The useful ones:
+
+| Setting | What it does |
+| --- | --- |
+| `steady` | cursor steadiness when your finger is still. Lower = steadier (try 0.3 to 1.5) |
+| `responsive` | how fast the cursor catches up when you move. Higher = less lag |
+| `still_px` | wobbles smaller than this many pixels are ignored |
+| `scroll_speed` / `scroll_max` | how fast scrolling speeds up, and its top speed (wheel notches per second) |
+| `curl_ratio` | how much the index finger has to bend before the cursor holds still (for thumbs-up) |
+| `read_hold`, `hold_time`, `palm_enter`, `click_confirm` | how long each gesture has to be held |
+
+Also: pinch sensitivity, zoom range, preview text size, spoken announcements.
 
 ### Accessibility (Section 508 / WCAG 2.0 AA)
 
