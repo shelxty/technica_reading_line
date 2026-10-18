@@ -9,9 +9,6 @@ There are three versions:
 - **`extension/`**: a Chrome extension (also works in Edge / Brave). Works on macOS, Windows and Linux.
 - **`hand_cursor1.py`**: the original Windows-only desktop script.
 
-## Windows app
-
-Needs Windows 10 or 11, a webcam, and **Python 3.9 to 3.12** (MediaPipe doesn't support newer Python yet).
 
 ### Setup (once)
 
@@ -42,12 +39,11 @@ You can resize it to make its text bigger.
 | --- | --- |
 | Point with your index finger | moves the mouse. The line of text under it is highlighted black on yellow. On a link, button, tab, menu item, checkbox or text field, just that element is highlighted |
 | Thumbs up, hold for half a second | reads the line (or link / button / tab) your finger last rested on, out loud. It stays highlighted until it's finished. Links and buttons are read by their name and type, like a screen reader: "Contact us, link" |
-| Open palm (four fingers up), then move it up / down | scroll. The further you move, the faster |
-| Quick pinch (thumb + index) | click |
-| Pinch and hold, then move your hand up / down | zoom in / out, from 50% to 300% |
+| Open palm (four fingers up), then move it up / down | scroll. The faster you move, the further you scroll |
+| Quick pinch (in under 0.4 seconds) (thumb + index) | click |
+| Pinch and hold, then move your hand up / down | zoom in / out, from 100% to 300% |
 
-Zoom works like Ctrl + mouse wheel, so it zooms the app under the cursor (Chrome, Edge, Word, PDF readers...).
-The 50% to 300% steps are the ones Chrome and Edge use. When you quit, zoom goes back to where it started.
+Zoom uses the Windows Magnifier, which means it's able to be performed on any browser and any application, at any time. 
 
 ### Keys (in the preview window)
 
@@ -79,25 +75,6 @@ Settings are saved in `windows_app/settings.json`. Close the app before editing 
 
 Also: pinch sensitivity, zoom range, preview text size.
 
-### Accessibility (Section 508 / WCAG 2.0 AA)
-
-What the app does to meet the WCAG 2.0 AA criteria that apply to it:
-
-| Criterion | How it's handled |
-| --- | --- |
-| 1.4.3 Contrast (minimum) | Highlight is black on yellow (19.6:1). Preview text sits on a solid black box: white 21:1, yellow 19.6:1, orange 10.6:1. All above 4.5:1, and checked in the tests |
-| 1.4.1 Use of color | Every state is shown as words ("Pointing", "Zoom 150%", "PAUSED"), not just colors |
-| 1.4.4 Resize text | The preview window can be resized, and `text_scale` in `settings.json` sets the text size |
-| 2.1.1 Keyboard | Every app function has a key (see above). Everything the gestures do (mouse, scroll, Ctrl + wheel zoom) can also be done with a normal mouse or keyboard |
-| 2.1.2 No keyboard trap | `Space` pauses hand control at any time, and `q` / `Esc` / closing the window quits |
-| 2.2.1 Timing adjustable | Every hold time (`read_hold`, `hold_time`, `palm_enter`, `click_confirm`) can be made longer in `settings.json` |
-| 2.2.2 Pause, stop, hide | `s` stops reading, `Space` pauses everything, `h` hides the highlight |
-| 2.3.1 Three flashes | Nothing flashes. The highlight only moves when your finger moves to another line, and it's far smaller than the WCAG flash area |
-| 3.3.1 Error identification | Problems are shown in words in the preview, for example "No OCR: pip install winocr" or "No text here" |
-| 4.1.3 Status messages (WCAG 2.1) | Changes ("Zoom 150%", "PAUSED", "No text here") show as text in the preview window. The voice is only used to read lines |
-
-This is a self-check, not a formal audit. Official Section 508 conformance needs testing by an accessibility
-reviewer with assistive technology (for example the NVDA or JAWS screen readers).
 
 ### Tests
 
@@ -112,22 +89,16 @@ python -m pytest tests
 
 ### Install
 
-1. Open `chrome://extensions`
-2. Turn on **Developer mode** (top right)
-3. Click **Load unpacked** and pick the `extension/` folder
-4. Pin the extension, click its icon, then click **Start hand tracking**
-5. The first time, a tab opens asking for the camera. Click **Allow camera**
+1. Download this repository as a `.zip` file.
+2. Extract the folder.
+3. Open `chrome://extensions`
+4. Turn on **Developer mode** (top right)
+5. Click **Load unpacked** and pick the extracted `extension/` folder
+6. Pin the extension, click its icon, then click **Start hand tracking**
+7. The first time, a tab opens asking for the camera. Click **Allow camera**
 
 Shortcut: `Alt+Shift+H` starts / stops tracking.
 
-### Gestures
-
-| Gesture | What it does |
-| --- | --- |
-| Point with index finger | moves the on-page cursor |
-| Quick pinch (thumb + index) | click |
-| Pinch & hold, then hand up / down | zoom in / out (up to 3×) |
-| Hold index + middle finger up | turn line highlighting on / off |
 
 ### How it works
 
