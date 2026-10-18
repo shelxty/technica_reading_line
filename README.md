@@ -128,7 +128,20 @@ The MediaPipe files in `extension/lib/` come from `@mediapipe/tasks-vision@0.10.
 
 ## Original script (Windows)
 
+In your terminal...
 ```
 pip install opencv-python mediapipe numpy pyautogui
 python hand_cursor1.py
 ```
+
+
+## Demo
+<img width="1733" height="765" alt="Screenshot 2026-10-18 113125" src="https://github.com/user-attachments/assets/78e6e97c-9600-491d-aa66-fa23f0e4c938" />
+<img width="1850" height="822" alt="Screenshot 2026-10-18 113208" src="https://github.com/user-attachments/assets/ba788e7f-a02d-445b-8a2e-b57f4a1362c3" />
+<img width="1828" height="823" alt="Screenshot 2026-10-18 113253" src="https://github.com/user-attachments/assets/dc0ffba1-2504-4cb9-9138-4193bb82c0e0" />
+<img width="431" height="440" alt="Screenshot 2026-10-18 114651" src="https://github.com/user-attachments/assets/571027df-f00a-41fa-8cee-aece9ac8179d" />
+
+
+
+https://github.com/user-attachments/assets/c8b3e471-f6ed-40d8-99e9-ce5d1662dda5
+
