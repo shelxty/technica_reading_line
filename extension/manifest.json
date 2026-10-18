@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Reading Line – Hand Gestures",
+  "version": "1.0.0",
+  "description": "Point with your index finger to highlight the line you're reading, pinch to click, pinch-and-hold to zoom.",
+  "permissions": ["offscreen", "storage", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Reading Line",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-tracking": {
+      "suggested_key": { "default": "Alt+Shift+H" },
+      "description": "Start / stop hand tracking"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

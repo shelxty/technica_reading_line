@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>Reading Line</h1>
+  <p class="status" id="status">Camera off</p>
+  <button id="toggle" class="primary">Start hand tracking</button>
+
+  <label class="row"><input type="checkbox" id="highlightOn"> Highlight the line I point at</label>
+  <label class="row"><input type="checkbox" id="showPreview"> Show hand preview on page</label>
+
+  <h2>Gestures</h2>
+  <ul>
+    <li><b>Point</b> with your index finger to move the cursor</li>
+    <li><b>Quick pinch</b> (thumb + index) to click</li>
+    <li><b>Pinch &amp; hold</b>, then move hand up / down to zoom in / out</li>
+    <li><b>Hold index + middle finger up</b> to turn highlighting on / off</li>
+  </ul>
+  <p class="hint">Shortcut: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> starts / stops tracking.</p>
+  <script src="popup.js"></script>
+</body>
+</html>
