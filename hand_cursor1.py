@@ -90,7 +90,7 @@ pinch_start = 0.0 # time when last pinch started
 zoom_mode = False 
 anchor_y = 0.0 
 zoom_level = 0 
-frozen = (sx sy) # cursor position when zooming started
+frozen = (sx, sy) # cursor position when zooming started
 status = "Move your hand"
 
 cap = cv2.VideoCapture(0) # open the webcam
@@ -104,4 +104,95 @@ try:
             if not ret:  
                 break # if there's no frame, there must be a camera problem, so we break
             frame = cv2.flip(frame, 1) # mirror img so that moving rihgt moves the cursor right too
-            
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert to RGB for MediaPipe
+            # ^ this is because opencv uses bgr but mediapipe uses rgb 
+            mp_image = mp.Image(image_format = mp.ImageFormat.SRGB, data=rgb) # convert to mediapipe image format
+
+            ts = int((time.time() - start) * 1000) # timestamp in milliseconds
+            result = landmarker.detect_for_video(mp_image, ts) # run the model on the frame
+
+            if result.hand_landmarks: # only act if hand = detected 
+                hand = result.hand_landmarks[0]
+                draw_landmarks(frame, hand) #self-explanatory
+                now = time.time() # what is the time.time now??
+                ratio = pinch_ratio(hand) # how closed ur hand is. how pinchy ur doing yes
+
+                if not pinching: # if ur not pinching, this controls cursor movement 
+                    tx, ty = to_screen(hand[8]) # get the screen coords of the index finger tip
+                    sx = sx * SMOOTH + tx * (1 - SMOOTH) 
+                    sy = sy * SMOOTH + ty * (1 - SMOOTH) 
+                    history.append((sx, sy)) # add the new cursor position to the history for smoothing
+                    pyautogui.moveTo(
+                        min(max(sx, 1), SCREEN_W - 2), # keep 1 px away from the edges to prevent failsafe from activating
+                        min(max(sy, 1), SCREEN_H - 2)
+                    )
+                    status = "Pointing"
+
+                if not pinching and ratio < PINCH_ENTER: # if ur pinch just started!
+                    pinching = True 
+                    pinch_start = now # note the time it began
+                    zoom_mode = False 
+                    # closing ur fingers = fingertip drifts, so you need to use the position from a few frames before to make it accurate
+
+                    frozen = history[0] if history else (sx, sy)
+
+                    pyautogui.moveTo(
+                        min(max(frozen[0], 1), SCREEN_W - 2),
+                        min(max(frozen[1], 1), SCREEN_H - 2)) # snap mouse back
+
+                    status = "Pinch..."
+
+                elif pinching and not zoom_mode and (now - pinch_start) > HOLD_TIME: # if ur pinch has been held for long enough, enter zoom mode
+                    zoom_mode = True 
+                    anchor_y = hand[8].y # the y coord of the index finger tip when zooming started
+                    status = "Zoom: hand up - in, down = out"
+
+                if pinching and zoom_mode: 
+                    dy = anchor_y - hand[8].y # how far the finger has moved up or down since zooming started
+                    if dy > ZOOM_STEP and zoom_level < MAX_ZOOM: # if the finger has moved up enough, zoom in
+                        pyautogui.hotkey("win", "=")
+                        zoom_level += 1
+                        anchor_y = hand[8].y # reset reference so each step = new movement
+                    elif dy < -ZOOM_STEP and zoom_level > 0: 
+                        if zoom_level == 1: 
+                            pyautogui.hotkey("win", "esc") # step goes back to normal size so we close the magnifier entirely
+                        else: 
+                            pyautogui.hotkey("win", "-") # otherwise, just zoom out by one step 
+                        zoom_level -= 1
+                        anchor_y = hand[8].y # reset reference so each step = new movement
+
+                if pinching and ratio > PINCH_EXIT: # this is for when the pinch is released 
+                    pinching = False 
+                    if not zoom_mode: 
+                        pyautogui.click() # if it was released before the hold time, it was a quick pinch which counts as a click instead
+                        status = "CLICK"
+                    else: 
+                        status = "Zoom set" # zoom gesture ended so there's no click
+                    history.clear() 
+                else: 
+                    status = "No hand"
+
+                cv2.putText(frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2) # display the status on the preview window in cyan, size 0.8
+                cv2.imshow(WINDOW, frame) # show the webcam feed with the skeleton and status text
+
+                key = cv2.waitKey(1) & 0xFF # process window events and get the key pressed
+                if key in (ord('q'), 27): # if 'q' or ESC is pressed, exit the loop
+                    break
+                if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
+                    break # if u click the "X" on the window then it closes too (woah! really?? no idea!!)
+
+finally:
+    if zoom_level > 0: 
+        pyautogui.hotkey("win", "esc") # if the magnifier is still open, close it
+    cap.release() # free webcam !!!! ur free now!!!!!!
+    cv2.destroyAllWindows() # close windows!!!!!!!!1
+    for _ in range(5): 
+        cv2.waitKey(1) # wait a bit to make sure the window is closed before the script ends because errors errors errorcodezero (ref???)
+                        
+
+
+
+
+
+
+
