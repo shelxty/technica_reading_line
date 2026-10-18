@@ -88,11 +88,53 @@ def line_extent(gray, top, bottom, x, ink_diff=40, word_gap=1.5):
 
 
 def high_contrast(rgb, bg_color, fg_color):
-    """rgb = HxWx3 screenshot of one line. returns the same line redrawn as text color on bg color"""
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)  # split light/dark automatically
-    text = mask > 0 if (mask > 0).mean() < 0.5 else mask == 0  # text = the smaller group
-    out = np.empty((*gray.shape, 3), dtype=np.uint8)
-    out[:] = bg_color
-    out[text] = fg_color
-    return out
+    """rgb = HxWx3 screenshot of one line. returns the same line redrawn as text color on bg color.
+    keeps the soft (anti-aliased) edges of the letters, so the text looks as smooth as the original
+    instead of jagged - the same look as the browser extension's highlight"""
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)
+    bg = np.median(gray)  # most of a line is background
+    dist = np.abs(gray - bg)  # works for dark-on-light and light-on-dark (dark mode) text
+    strongest = dist.max()
+    out = np.empty((*gray.shape, 3), dtype=np.float32)
+    if strongest < 40:  # no text in there
+        out[:] = bg_color
+        return out.astype(np.uint8)
+    ink = np.clip(dist / (0.85 * strongest), 0, 1)[..., None]  # 0 = background, 1 = solid letter
+    out[:] = np.array(bg_color, np.float32) * (1 - ink) + np.array(fg_color, np.float32) * ink
+    return np.round(out).astype(np.uint8)
+
+
+# the frame around the highlight, same as the extension: 3px yellow ring + 1px dark outline, rounded corners
+RING = 3
+OUTLINE = 1
+RADIUS = 3
+BORDER = RING + OUTLINE  # how far the frame sticks out around the line
+
+
+def render_highlight(region, inner, bg_color=(255, 255, 0), fg_color=(0, 0, 0)):
+    """region = HxWx3 screenshot of the line plus BORDER px around it, inner = (x0, y0, x1, y1) of the
+    line inside that screenshot. returns what the highlight window shows: the line as black text on
+    yellow, a yellow ring around it, and a thin see-through dark outline (60% black over the page)"""
+    from PIL import Image, ImageDraw
+
+    page = Image.fromarray(region).convert("RGB")
+    w, h = page.size
+    x0, y0, x1, y1 = inner
+    out = page.copy()
+
+    # dark outline: the page darkened to 40%, like rgba(0, 0, 0, .6) in the extension
+    outline = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(outline).rounded_rectangle(
+        (x0 - BORDER, y0 - BORDER, x1 - 1 + BORDER, y1 - 1 + BORDER), radius=RADIUS + BORDER, fill=255)
+    out.paste(Image.eval(page, lambda v: int(v * 0.4)), mask=outline)
+
+    # yellow ring
+    ImageDraw.Draw(out).rounded_rectangle(
+        (x0 - RING, y0 - RING, x1 - 1 + RING, y1 - 1 + RING), radius=RADIUS + RING, fill=bg_color)
+
+    # the line itself, recolored
+    text = Image.fromarray(high_contrast(region[y0:y1, x0:x1], bg_color, fg_color))
+    corners = Image.new("L", text.size, 0)
+    ImageDraw.Draw(corners).rounded_rectangle((0, 0, text.size[0] - 1, text.size[1] - 1), radius=RADIUS, fill=255)
+    out.paste(text, (x0, y0), corners)
+    return np.array(out)

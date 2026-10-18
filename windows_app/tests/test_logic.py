@@ -209,6 +209,36 @@ def test_high_contrast_recolors_text():
     assert tuple(out[0, 0]) == YELLOW
 
 
+def test_high_contrast_keeps_smooth_letter_edges():
+    rgb = np.full((20, 50, 3), 255, dtype=np.uint8)
+    rgb[5:15, 10:20] = 0  # solid letter
+    rgb[5:15, 20] = 128  # soft (anti-aliased) edge
+    out = high_contrast(rgb, YELLOW, BLACK)
+    edge = out[10, 20]
+    assert 0 < edge[0] < 255 and edge[2] == 0  # in between black and yellow, not snapped to either
+
+
+def test_high_contrast_dark_mode_text():
+    rgb = np.full((20, 50, 3), 30, dtype=np.uint8)  # dark background
+    rgb[5:15, 10:20] = 220  # light text
+    out = high_contrast(rgb, YELLOW, BLACK)
+    assert tuple(out[10, 15]) == BLACK and tuple(out[0, 0]) == YELLOW
+
+
+def test_highlight_frame_looks_like_the_extension():
+    from linefinder import BORDER, RING, render_highlight
+    h, w = 30, 120
+    region = np.full((h + 2 * BORDER, w + 2 * BORDER, 3), 255, dtype=np.uint8)  # white page
+    region[BORDER + 10:BORDER + 20, BORDER + 20:BORDER + 40] = 0  # some text
+    out = render_highlight(region, (BORDER, BORDER, BORDER + w, BORDER + h))
+    mid_y = BORDER + h // 2
+    assert tuple(out[mid_y, BORDER + 25]) == BLACK  # text -> black
+    assert tuple(out[mid_y, BORDER + 80]) == YELLOW  # line background -> yellow
+    assert tuple(out[mid_y, BORDER - RING]) == YELLOW  # 3px yellow ring
+    assert tuple(out[mid_y, 0]) == (102, 102, 102)  # outline = page darkened by 60%
+    assert tuple(out[0, 0]) == (255, 255, 255)  # rounded corner: page shows through
+
+
 # ---------- contrast (WCAG 2.0 AA / Section 508: at least 4.5:1 for text) ----------
 
 def contrast(rgb1, rgb2):

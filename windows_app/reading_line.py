@@ -38,11 +38,11 @@ import numpy as np
 import pyautogui
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
-from PIL import ImageGrab
+from PIL import Image, ImageGrab
 
 import gestures
 import settings as settings_file
-from linefinder import BLACK, YELLOW, find_line_in_gray, high_contrast, line_extent
+from linefinder import BLACK, BORDER, YELLOW, find_line_in_gray, line_extent, render_highlight
 from overlays import HighlightOverlay
 from speech import Reader
 
@@ -154,15 +154,21 @@ def inside(box, x, y):
 
 
 def show_box(box):
-    """highlights `box` (black on yellow). returns the plain screenshot of that line"""
+    """highlights `box`: black text on yellow with a yellow ring and thin dark outline around it,
+    same look as the browser extension. returns the plain screenshot of the line (for reading)"""
     global overlay_box
     if overlay.visible:
         overlay.hide()  # hide so the screenshot doesn't capture it
         time.sleep(0.03)
-    img = grab(box)
-    overlay.show(high_contrast(np.array(img.convert("RGB")), YELLOW, BLACK), box)
+    # the frame sticks out BORDER px around the line, so grab that much extra
+    frame = (max(0, box[0] - BORDER), max(0, box[1] - BORDER),
+             min(SCREEN_W, box[2] + BORDER), min(SCREEN_H, box[3] + BORDER))
+    region = np.array(grab(frame).convert("RGB"))
+    inner = (box[0] - frame[0], box[1] - frame[1], box[2] - frame[0], box[3] - frame[1])
+    overlay.show(render_highlight(region, inner, YELLOW, BLACK), frame)
     overlay_box = box
-    return img
+    x0, y0, x1, y1 = inner
+    return Image.fromarray(region[y0:y1, x0:x1])
 
 
 def update_line(cx, cy, now):
