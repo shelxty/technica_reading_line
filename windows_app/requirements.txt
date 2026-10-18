@@ -1,0 +1,7 @@
+opencv-python
+mediapipe
+numpy
+pyautogui
+pillow
+pywin32
+winocr

@@ -3,10 +3,73 @@
 Point at text with your finger (via webcam) to highlight the line you're reading,
 pinch to click, pinch-and-hold to zoom.
 
-There are two versions:
+There are three versions:
 
+- **`windows_app/`**: the Windows desktop app (newest). Works over any app on your screen.
 - **`extension/`**: a Chrome extension (also works in Edge / Brave). Works on macOS, Windows and Linux.
 - **`hand_cursor1.py`**: the original Windows-only desktop script.
+
+## Windows app
+
+Needs Windows 10 or 11 and **Python 3.9 to 3.12** (MediaPipe doesn't support newer Python yet).
+
+### Setup (once)
+
+Open a terminal in the `windows_app` folder:
+
+```
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Run
+
+```
+venv\Scripts\activate
+python reading_line.py
+```
+
+A preview window with your webcam shows up. Click on it once so it gets your key presses.
+
+### Gestures
+
+| Gesture | What it does |
+| --- | --- |
+| Point with index finger | moves the mouse |
+| Quick pinch (thumb + index) | click |
+| Pinch & hold, then hand up / down | zoom in / out (Windows Magnifier) |
+| Hold index + middle finger up | highlight on / off |
+| **Open palm**, then move it up / down | **scroll** (the further you move from where you started, the faster) |
+| **Thumbs up**, hold for half a second | **read the line you were pointing at out loud** |
+| **Hold the cursor still** (dwell mode on) | **click** without pinching |
+
+### Keys (in the preview window)
+
+| Key | What it does |
+| --- | --- |
+| `h` | highlight on / off |
+| `r` | reading ruler on / off (dims the whole screen except your line) |
+| `c` | next highlight colors (yellow, dark, blue tint, peach, white on blue) |
+| `a` | auto-read on / off (reads each line after you stay on it for a moment) |
+| `d` | dwell click on / off |
+| `t` | read the current line now |
+| `s` | stop speaking |
+| `[` / `]` | ruler darker / lighter |
+| `-` / `=` | voice slower / faster |
+| `q` or `Esc` | quit |
+
+Your choices are saved in `windows_app/settings.json`. That file also has every other setting
+(smoothing, pinch sensitivity, dwell time, scroll speed...). Close the app before editing it.
+
+### Tests
+
+The gesture, dwell, scroll and line-finding logic has tests that don't need a webcam:
+
+```
+pip install pytest
+python -m pytest tests
+```
 
 ## Chrome extension
 
@@ -51,7 +114,7 @@ Settings (pinch thresholds, smoothing, etc.) are at the top of `extension/conten
 
 The MediaPipe files in `extension/lib/` come from `@mediapipe/tasks-vision@0.10.21`.
 
-## Python version (Windows)
+## Original script (Windows)
 
 ```
 pip install opencv-python mediapipe numpy pyautogui
