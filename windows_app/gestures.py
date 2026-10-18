@@ -32,12 +32,6 @@ def finger_folded(hand, tip, pip):
     return dist(hand[tip], hand[0]) < dist(hand[pip], hand[0])
 
 
-def two_finger_pose(hand):
-    # index + middle up, ring + pinky down
-    return (finger_up(hand, 8, 6) and finger_up(hand, 12, 10)
-            and not finger_up(hand, 16, 14) and not finger_up(hand, 20, 18))
-
-
 def open_palm_pose(hand):
     # all four fingers up = scroll mode (thumb can be anywhere)
     return all(finger_up(hand, tip, pip) for tip, pip in FINGERS)
@@ -61,8 +55,6 @@ def pose_name(hand):
         return "open palm"
     if thumbs_up_pose(hand):
         return "thumbs up"
-    if two_finger_pose(hand):
-        return "two fingers"
     if fist_pose(hand):
         return "fist"
     if finger_up(hand, 8, 6):
@@ -86,30 +78,9 @@ def scroll_velocity(offset, deadzone, speed):
     return math.copysign((abs(offset) - deadzone) * speed, offset)
 
 
-class Dwell:
-    # "hold still to click". update() every frame with the cursor position;
-    # it returns (progress 0..1, fire). after it fires you have to move away before it can fire again
+# the zoom steps chrome and edge use for ctrl + mouse wheel
+BROWSER_ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500]
 
-    def __init__(self, radius, hold):
-        self.radius = radius
-        self.hold = hold
-        self.reset()
 
-    def reset(self):
-        self.anchor = None
-        self.start = 0.0
-        self.armed = True
-
-    def update(self, x, y, now):
-        if self.anchor is None or math.hypot(x - self.anchor[0], y - self.anchor[1]) > self.radius:
-            self.anchor = (x, y)
-            self.start = now
-            self.armed = True
-            return 0.0, False
-        if not self.armed:
-            return 0.0, False
-        progress = (now - self.start) / self.hold
-        if progress >= 1:
-            self.armed = False
-            return 1.0, True
-        return progress, False
+def zoom_levels(lowest, highest):
+    return [z for z in BROWSER_ZOOM_LEVELS if lowest <= z <= highest]

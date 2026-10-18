@@ -1,5 +1,6 @@
 # all the tunable settings live here. they're saved to settings.json next to this file,
-# so whatever you change with the keyboard shortcuts is remembered next time
+# so you can change them (close the app first) and they're remembered next time.
+# every timing below can be made longer if you need more time for a gesture
 
 import json
 import os
@@ -7,50 +8,42 @@ import os
 SETTINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
 DEFAULTS = {
-    # cursor + pinch (same as hand_cursor1.py)
-    "margin": 0.15,  # ignore the outer 15% of the camera frame so you can reach the edges
+    # cursor
+    "margin": 0.15,  # ignore the outer 15% of the camera frame so you can reach the screen edges
     "smooth": 0.8,  # cursor smoothing. higher = steadier but laggier
+    "lookback": 6,  # use the cursor position from this many frames ago when a pinch starts
+
+    # pinch = click, pinch + hold + move = zoom
     "pinch_enter": 0.25,  # pinch "closed" when thumb-index gap is below this fraction of palm size
     "pinch_exit": 0.4,
+    "click_confirm": 0.25,  # wait this long before clicking, so a thumbs-up can cancel it
     "hold_time": 0.4,  # hold a pinch this long to zoom instead of click
-    "zoom_step": 0.06,
-    "max_zoom": 5,
-    "lookback": 6,  # use cursor position from this many frames ago when a pinch starts
-    "two_finger_hold": 0.8,
-    "click_confirm": 0.25,  # wait this long after a pinch before clicking, so a thumbs-up can cancel it
+    "zoom_step": 0.06,  # how far to move your hand (fraction of camera height) per zoom step
+    "zoom_min": 50,  # percent
+    "zoom_max": 300,
 
-    # line detection
-    "region_w": 900,  # width of screenshot strip
+    # highlight (black text on yellow)
+    "highlight": True,
+    "region_w": 900,  # width of the area around the finger used to find which line it's on
     "search_h": 40,  # px above/below the fingertip to search for text
     "snap": 12,  # snap to text within this many px if the fingertip is between lines
     "ink_diff": 40,  # how different a pixel must be from the background to count as text
     "pad": 3,  # extra px of padding around the highlighted line
-    "word_gap": 1.5,  # a horizontal gap wider than this many line-heights = end of the line (column edge)
+    "word_gap": 1.5,  # a gap wider than this many line-heights = end of the line (column edge)
 
-    # highlight look (index into linefinder.COLOR_PRESETS)
-    "color_preset": 0,
-    "highlight_on": False,
-
-    # reading ruler: dims the whole screen except the line you're on
-    "ruler_on": False,
-    "ruler_dim": 0.6,  # 0 = no dimming, 1 = black
-
-    # read aloud
-    "auto_read": False,  # read each new line automatically after you stay on it
-    "auto_read_delay": 0.8,  # seconds on a line before auto-read kicks in
-    "read_hold": 0.5,  # seconds to hold thumbs-up before it reads
+    # thumbs up = read aloud
+    "read_hold": 0.5,  # seconds to hold a thumbs-up before it reads
     "voice_rate": 0,  # -10 (slow) .. 10 (fast)
     "ocr_lang": "en",
+    "announce": True,  # say changes out loud too ("zoom 150 percent", "paused"...)
 
-    # dwell click: hold the cursor still to click (no pinch needed)
-    "dwell_on": False,
-    "dwell_time": 1.5,
-    "dwell_radius": 25,  # px the cursor can wobble and still count as "still"
-
-    # open-palm scrolling
+    # open palm = scroll
     "palm_enter": 0.25,  # hold an open palm this long to start scrolling
     "scroll_deadzone": 0.03,  # how far (fraction of camera height) to move before scrolling starts
     "scroll_notches": 60,  # scroll speed: mouse-wheel notches per second per unit of hand movement
+
+    # preview window
+    "text_scale": 0.7,  # size of the text in the preview window
 }
 
 

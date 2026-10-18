@@ -7,20 +7,16 @@ run:
     python reading_line.py
 
 gestures:
-    point with index finger        -> moves the mouse
-    quick pinch (thumb + index)    -> click
-    pinch + hold, then up / down   -> zoom in / out (windows magnifier)
-    index + middle finger up, hold -> highlight on / off
-    open palm, then up / down      -> scroll (further from where you started = faster)
-    thumbs up, hold                -> read the line you were pointing at out loud
-    hold still (dwell mode on)     -> click, no pinch needed
+    point with your index finger       -> moves the mouse, and the line of text under it is highlighted
+    thumbs up, hold half a second      -> reads the highlighted line out loud
+    open palm, then move up / down     -> scroll (the further you move, the faster)
+    quick pinch (thumb + index)        -> click
+    pinch + hold, then move up / down  -> zoom in / out, 50% to 300% (same as ctrl + mouse wheel)
 
 keys (click on the preview window first so it gets the key presses):
-    h  highlight on/off          r  reading ruler on/off      c  next highlight colors
-    a  auto-read on/off          d  dwell click on/off        t  read current line now
-    s  stop speaking             [ ]  ruler dimmer / brighter  - =  voice slower / faster
-    v  overlay test: shows the highlight + ruler in the middle of the screen for 3 seconds
-    q or esc  quit
+    space  pause / resume hand control      h  highlight on / off
+    t      read the current line            s  stop reading
+    -  =   voice slower / faster            q or esc  quit
 """
 
 import ctypes
@@ -39,15 +35,14 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import pyautogui
-import tkinter as tk
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 from PIL import ImageGrab
 
 import gestures
 import settings as settings_file
-from linefinder import COLOR_PRESETS, find_line_in_gray, high_contrast, line_extent
-from overlays import DwellRing, LineOverlay, RulerMask
+from linefinder import BLACK, YELLOW, find_line_in_gray, high_contrast, line_extent
+from overlays import HighlightOverlay
 from speech import Reader
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -105,41 +100,23 @@ def clamp_to_screen(x, y):
     return min(max(x, 1), SCREEN_W - 2), min(max(y, 1), SCREEN_H - 2)
 
 
-# ---------- overlays ----------
-
-root = tk.Tk()
-root.withdraw()
-line_ov = LineOverlay(root)
-ruler = RulerMask(root, SCREEN_W, SCREEN_H, S.ruler_dim)
-ring = DwellRing(root)
-OVERLAYS = (line_ov, ruler, ring)
-# on windows 10 (2004+) / 11 the overlays are invisible to screenshots, so we never have to hide them
-CAPTURE_SAFE = all(o.excluded for o in OVERLAYS)
-if not CAPTURE_SAFE:
-    print("Older Windows: overlays will blink briefly when the line changes")
-
+overlay = HighlightOverlay()
 reader = Reader(S.ocr_lang, S.voice_rate)
 
 
+def announce(text):
+    # spoken feedback, so you don't have to look at the preview window to know what happened
+    if S.announce:
+        reader.say(text)
+
+
+# ---------- highlight ----------
+
+line_box = None  # screen rectangle of the highlighted line; None = nothing highlighted
+
+
 def grab(box):
-    if CAPTURE_SAFE:
-        return ImageGrab.grab(bbox=box, all_screens=True)
-    for o in OVERLAYS:
-        o.suspend()
-    root.update()
-    time.sleep(0.03)
-    try:
-        return ImageGrab.grab(bbox=box, all_screens=True)
-    finally:
-        for o in OVERLAYS:
-            o.resume()
-
-
-# ---------- line detection + highlight + ruler ----------
-
-line_box = None  # screen rectangle of the line under the finger; None = no line
-line_since = 0.0  # when we landed on this line (for auto-read)
-auto_read_done = True
+    return ImageGrab.grab(bbox=box, all_screens=True)
 
 
 def find_line(cx, cy):
@@ -158,8 +135,8 @@ def find_line(cx, cy):
         return None
     top, bottom = box[1], box[3]
 
-    # 2) how far left/right does it go? follow the text across the whole screen until a big gap,
-    #    so a long line isn't cut off just because it's wider than the search area
+    # 2) how far left/right does it go? follow the text until a big gap (column edge), so the whole
+    #    line gets highlighted and read, not just the part near your finger
     extent = line_extent(full, top, bottom, cx, S.ink_diff, S.word_gap)
     if extent is None:
         left, right = x0 + box[0], x0 + box[2]
@@ -168,121 +145,110 @@ def find_line(cx, cy):
     return left, y0 + top, right, y0 + bottom
 
 
-def show_line_visuals():
-    if line_box is None:
-        line_ov.hide()
-        return
-    if S.highlight_on:
-        _, bg, fg = COLOR_PRESETS[S.color_preset % len(COLOR_PRESETS)]
-        line_ov.show(high_contrast(np.array(grab(line_box).convert("RGB")), bg, fg), line_box)
-    else:
-        line_ov.hide()
-    if S.ruler_on:
-        ruler.show(line_box)
+def inside(box, x, y):
+    return box is not None and box[0] <= x <= box[2] and box[1] <= y <= box[3]
+
+
+def update_highlight(cx, cy):
+    global line_box
+    if inside(line_box, cx, cy):
+        return  # still on the same line, do nothing
+    overlay.hide()  # hide so the screenshot doesn't capture it
+    time.sleep(0.03)
+    line_box = find_line(cx, cy)
+    if line_box:
+        overlay.show(high_contrast(np.array(grab(line_box).convert("RGB")), YELLOW, BLACK), line_box)
 
 
 def forget_line():
     global line_box
     line_box = None
-    line_ov.hide()
-
-
-def update_line(cx, cy, now):
-    global line_box, line_since, auto_read_done
-    b = line_box
-    if b and b[0] <= cx <= b[2] and b[1] <= cy <= b[3]:
-        return  # still on the same line, nothing to do
-    box = find_line(cx, cy)
-    if box is None:
-        line_box = None
-        line_ov.hide()  # the ruler keeps showing the last line so it doesn't blink between lines
-        return
-    line_box = box
-    line_since = now
-    auto_read_done = False
-    show_line_visuals()
+    overlay.hide()
 
 
 def read_line_at(x, y):
-    b = line_box
-    box = b if (b and b[0] <= x <= b[2] and b[1] <= y <= b[3]) else find_line(x, y)
+    box = line_box if inside(line_box, x, y) else None
     if box is None:
+        forget_line()
+        time.sleep(0.03)
+        box = find_line(x, y)
+    if box is None:
+        announce("No text here")
         return "No text here"
     reader.read_image(grab(box))
     return "Reading aloud"
 
 
-# ---------- settings shortcuts ----------
+# ---------- zoom (ctrl + mouse wheel, like ctrl + / ctrl - in browsers, Word, PDF readers...) ----------
 
-def toggle(name, label):
-    S[name] = not S[name]
-    settings_file.save(S)
-    apply_settings()
-    return f"{label} {'ON' if S[name] else 'OFF'}"
+ZOOM_LEVELS = gestures.zoom_levels(S.zoom_min, S.zoom_max)
+ZOOM_START = ZOOM_LEVELS.index(100) if 100 in ZOOM_LEVELS else 0
+zoom_index = ZOOM_START
 
 
-def apply_settings():
-    if not S.highlight_on:
-        line_ov.hide()
-    if not S.ruler_on:
-        ruler.hide()
-    if not S.dwell_on:
-        ring.hide()
-        dwell.reset()
-    forget_line()  # makes the next frame find + redraw the line with the new settings
+def zoom_by(direction):
+    """direction +1 = zoom in, -1 = zoom out. returns False at the 50% / 300% limits"""
+    global zoom_index
+    new = zoom_index + direction
+    if not 0 <= new < len(ZOOM_LEVELS):
+        return False
+    pyautogui.keyDown("ctrl")
+    try:
+        pyautogui.scroll(120 * direction)  # one mouse-wheel notch = one zoom step
+    finally:
+        pyautogui.keyUp("ctrl")
+    zoom_index = new
+    forget_line()  # the text moved
+    return True
 
 
-def lines_wanted():
-    return (S.highlight_on or S.ruler_on or S.auto_read) and time.time() > overlay_test_until
+# ---------- preview window ----------
+
+WINDOW = "Reading Line"
+WHITE_BGR, YELLOW_BGR, ORANGE_BGR = (255, 255, 255), (0, 255, 255), (0, 165, 255)
+HELP = ["space pause   h highlight   t read   s stop reading",
+        "- = voice speed   q quit"]
 
 
-overlay_test_until = 0.0
+def draw_text_block(frame, lines, top):
+    # text always sits on a solid black box, so it has high contrast no matter what the webcam shows
+    # (white on black 21:1, yellow 19.6:1, orange 10.6:1 - WCAG AA needs 4.5:1)
+    scale = S.text_scale
+    line_h = int(32 * scale / 0.7)
+    height = line_h * len(lines) + 10
+    y0 = top if top >= 0 else frame.shape[0] - height
+    cv2.rectangle(frame, (0, y0), (frame.shape[1], y0 + height), (0, 0, 0), -1)
+    for i, (text, color) in enumerate(lines):
+        cv2.putText(frame, text, (10, y0 + (i + 1) * line_h), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2,
+                    cv2.LINE_AA)
 
 
-def overlay_test():
-    """draws the highlight + ruler around a fake line in the middle of the screen, no text needed.
-    if you see this but not the real thing, the overlays work and it's the text detection that's off"""
-    global overlay_test_until
-    box = (SCREEN_W // 4, SCREEN_H // 2 - 20, SCREEN_W * 3 // 4, SCREEN_H // 2 + 20)
-    _, bg, fg = COLOR_PRESETS[S.color_preset % len(COLOR_PRESETS)]
-    img = np.empty((box[3] - box[1], box[2] - box[0], 3), dtype=np.uint8)
-    img[:] = bg
-    cv2.putText(img, "Reading Line overlay test", (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, fg, 2)
-    line_ov.show(img, box)
-    ruler.show(box)
-    overlay_test_until = time.time() + 3
-    return "Overlay test (3 s)"
-
-
-# ---------- hand landmarker ----------
+# ---------- main loop ----------
 
 options = vision.HandLandmarkerOptions(
     base_options=mp_python.BaseOptions(model_asset_path=model_path()),
     running_mode=vision.RunningMode.VIDEO,  # tracks hands across frames
-    num_hands=1,  # either hand works, but only one at a time
+    num_hands=1,  # either hand works, one at a time
     min_hand_detection_confidence=0.5,
     min_hand_presence_confidence=0.5,
     min_tracking_confidence=0.5,
 )
 
-# state
 sx, sy = SCREEN_W / 2, SCREEN_H / 2  # smoothed cursor position
 history = deque(maxlen=S.lookback)
+paused = False
+status = "Move your hand"
+
 pinching = False
 pinch_start = 0.0
 zoom_mode = False
 anchor_y = 0.0
-zoom_level = 0
 frozen = (sx, sy)
 pending_click = None  # (point, time) of a pinch click waiting to happen
-pinch_blocked = False  # after a fist, no pinching until the index finger is up again
-status = "Move your hand"
+pinch_blocked = False  # after a thumbs-up, no pinching until the index finger is up again
 
-two_start = None
-two_fired = False
-
-palm_start = None  # open palm first seen
-palm_lost = None  # open palm last lost (short grace period so scrolling doesn't stutter)
+palm_start = None
+palm_lost = None
 scrolling = False
 scroll_anchor = 0.0
 scroll_acc = 0.0  # leftover fraction of a mouse-wheel notch
@@ -291,14 +257,11 @@ thumb_start = None
 thumb_fired = False
 thumb_point = (sx, sy)
 
-dwell = gestures.Dwell(S.dwell_radius, S.dwell_time)
-
 cap = cv2.VideoCapture(0)
+cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)  # resizable, so you can make the text bigger
 start = time.time()
 last_t = start
 last_ts = -1
-WINDOW = "Reading Line"
-HELP = "h hl  r ruler  c colors  a auto-read  d dwell  t read  s stop  v test  q quit"
 
 try:
     with vision.HandLandmarker.create_from_options(options) as landmarker:
@@ -321,10 +284,23 @@ try:
                 hand = result.hand_landmarks[0]
                 draw_landmarks(frame, hand)
                 ratio = gestures.pinch_ratio(hand)
-                pose_info = f"pose: {gestures.pose_name(hand)}   pinch: {ratio:.2f}"
+                pose_info = f"Hand: {gestures.pose_name(hand)}"
+            else:
+                hand = None
+                pose_info = "Hand: not seen"
+
+            if paused:
+                status = "PAUSED - press space to resume"
+            elif hand is None:
+                status = "No hand"
+                thumb_start = None
+                thumb_fired = False
+                scrolling = False
+                palm_start = None
+                pending_click = None
+            else:
                 palm = not pinching and gestures.open_palm_pose(hand)
                 thumbs = not pinching and gestures.thumbs_up_pose(hand)
-                two = not pinching and gestures.two_finger_pose(hand)
 
                 # --- open palm = scroll ---
                 if palm:
@@ -336,11 +312,10 @@ try:
                         scroll_anchor = hand[9].y  # middle of the palm is the steadiest point
                         scroll_acc = 0.0
                         forget_line()
-                        ruler.hide()  # the page is about to move under it
                 elif scrolling:
                     if palm_lost is None:
                         palm_lost = now
-                    if now - palm_lost > 0.2:
+                    if now - palm_lost > 0.2:  # short grace period so scrolling doesn't stutter
                         scrolling = False
                         palm_start = None
                         history.clear()
@@ -355,9 +330,9 @@ try:
                         # always whole notches (120 each): lots of windows apps ignore anything smaller
                         pyautogui.scroll(notches * 120)
                         scroll_acc -= notches
-                    status = "Scrolling" + (" up" if v > 0 else " down" if v < 0 else " (move palm up/down)")
+                    status = "Scrolling" + (" up" if v > 0 else " down" if v < 0 else ": move palm up or down")
 
-                # --- pointing: move the cursor ---
+                # --- pointing: move the cursor + highlight the line under it ---
                 if not (pinching or scrolling or palm or thumbs):
                     tx, ty = to_screen(hand[8])  # index fingertip
                     sx = sx * S.smooth + tx * (1 - S.smooth)
@@ -365,53 +340,28 @@ try:
                     history.append((sx, sy))
                     pyautogui.moveTo(*clamp_to_screen(sx, sy))
                     status = "Pointing"
+                    if S.highlight:
+                        update_highlight(sx, sy)
 
-                    if lines_wanted() and zoom_level == 0:
-                        update_line(sx, sy, now)
-                    elif zoom_level > 0:
-                        # screenshots don't match the magnified view, so hide everything while zoomed
-                        forget_line()
-                        ruler.hide()
-
-                    if S.dwell_on and not two:
-                        progress, fire = dwell.update(sx, sy, now)
-                        if fire:
-                            ring.hide()
-                            root.update()  # actually remove the ring before clicking
-                            pyautogui.click(*clamp_to_screen(sx, sy))
-                            status = "DWELL CLICK"
-                        elif progress > 0.1:
-                            ring.show(sx, sy, progress)
-                        else:
-                            ring.hide()
-                    else:
-                        dwell.reset()
-                        ring.hide()
-                else:
-                    dwell.reset()
-                    ring.hide()
-
-                # --- pinch = click, pinch + hold = zoom ---
+                # --- pinch = click, pinch + hold + move = zoom ---
                 # making a thumbs-up drags the index finger past the thumb, which looks like a pinch.
-                # so: a pinch that turns into a thumbs-up is cancelled, and every click waits click_confirm
-                # seconds in case the thumb is on its way up
+                # so a pinch that turns into a thumbs-up is cancelled, and every click waits
+                # click_confirm seconds in case the thumb is on its way up
                 thumb_going_up = gestures.thumbs_up_pose(hand) or gestures.thumb_rising(hand)
                 if pinch_blocked and gestures.finger_up(hand, 8, 6) and not thumb_going_up:
-                    pinch_blocked = False  # index finger is back up, pinching allowed again
+                    pinch_blocked = False
 
                 if pending_click and thumb_going_up:
                     pending_click = None
-                    status = "Click cancelled (thumbs up)"
                 elif pending_click and now - pending_click[1] >= S.click_confirm:
                     pyautogui.click(*clamp_to_screen(*pending_click[0]))
                     pending_click = None
-                    status = "CLICK"
+                    status = "Click"
 
                 if pinching and not zoom_mode and gestures.thumbs_up_pose(hand):
                     pinching = False
                     pinch_blocked = True
                     history.clear()
-                    status = "Thumbs up (no click)"
 
                 if not pinching and not pinch_blocked and not scrolling and ratio < S.pinch_enter:
                     pinching = True
@@ -420,47 +370,30 @@ try:
                     # closing your fingers makes the fingertip drift, so use the position from a few frames ago
                     frozen = history[0] if history else (sx, sy)
                     pyautogui.moveTo(*clamp_to_screen(*frozen))
-                    status = "Pinch..."
+                    status = "Pinch"
                 elif pinching and not zoom_mode and now - pinch_start > S.hold_time:
                     zoom_mode = True
                     anchor_y = hand[8].y
-                    status = "Zoom: hand up = in, down = out"
+                    status = f"Zoom {ZOOM_LEVELS[zoom_index]}%: move hand up to zoom in, down to zoom out"
 
                 if pinching and zoom_mode:
                     dy = anchor_y - hand[8].y
-                    if dy > S.zoom_step and zoom_level < S.max_zoom:
-                        forget_line()
-                        ruler.hide()
-                        pyautogui.hotkey("win", "=")
-                        zoom_level += 1
-                        anchor_y = hand[8].y
-                    elif dy < -S.zoom_step and zoom_level > 0:
-                        pyautogui.hotkey("win", "esc" if zoom_level == 1 else "-")
-                        zoom_level -= 1
-                        anchor_y = hand[8].y
+                    if abs(dy) > S.zoom_step:
+                        anchor_y = hand[8].y  # each step needs a new movement
+                        direction = 1 if dy > 0 else -1
+                        if zoom_by(direction):
+                            status = f"Zoom {ZOOM_LEVELS[zoom_index]}%"
+                            announce(f"Zoom {ZOOM_LEVELS[zoom_index]} percent")
+                        else:
+                            limit = "maximum" if direction > 0 else "minimum"
+                            status = f"Zoom {ZOOM_LEVELS[zoom_index]}% ({limit})"
+                            announce(f"{limit} zoom")
 
                 if pinching and ratio > S.pinch_exit:
                     pinching = False
                     if not zoom_mode:
                         pending_click = (frozen, now)  # quick pinch = click (in a moment, see above)
-                    else:
-                        status = "Zoom set"
                     history.clear()
-
-                # --- index + middle up = highlight on/off ---
-                if two and not scrolling:
-                    if two_start is None:
-                        two_start = now
-                    elif not two_fired and now - two_start >= S.two_finger_hold:
-                        two_fired = True
-                        toggle("highlight_on", "Highlight")
-                    if not two_fired:
-                        status = f"Hold... {int((now - two_start) / S.two_finger_hold * 100)}%"
-                    else:
-                        status = "Highlight ON" if S.highlight_on else "Highlight OFF"
-                else:
-                    two_start = None
-                    two_fired = False
 
                 # --- thumbs up = read the line aloud ---
                 if thumbs and not scrolling:
@@ -472,96 +405,59 @@ try:
                         thumb_fired = True
                         status = read_line_at(*thumb_point)
                     if not thumb_fired:
-                        status = f"Read... {int((now - thumb_start) / S.read_hold * 100)}%"
+                        status = f"Thumbs up: reading in {max(0.0, S.read_hold - (now - thumb_start)):.1f}s"
                 else:
                     thumb_start = None
                     thumb_fired = False
 
-                # --- auto-read: read a line once you've stayed on it for a moment ---
-                if (S.auto_read and line_box and not auto_read_done and not scrolling and not pinching
-                        and now - line_since >= S.auto_read_delay):
-                    auto_read_done = True
-                    reader.read_image(grab(line_box))
-            else:
-                pose_info = "pose: no hand"
-                status = "No hand"
-                pending_click = None
-                two_start = None
-                two_fired = False
-                thumb_start = None
-                thumb_fired = False
-                scrolling = False
-                palm_start = None
-                dwell.reset()
-                ring.hide()
-
-            root.update()  # let tkinter redraw the overlays
+            overlay.update()  # let tkinter redraw the highlight
 
             # preview window
-            preset = COLOR_PRESETS[S.color_preset % len(COLOR_PRESETS)][0]
-            flags = (f"HL {'on' if S.highlight_on else 'off'} | Ruler {'on' if S.ruler_on else 'off'} | "
-                     f"Auto-read {'on' if S.auto_read else 'off'} | Dwell {'on' if S.dwell_on else 'off'} | {preset}")
-            cv2.putText(frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
-            cv2.putText(frame, flags, (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-            if overlay_test_until and time.time() > overlay_test_until:
-                overlay_test_until = 0.0
-                ruler.hide()
-                apply_settings()  # back to normal after the overlay test
-            if not lines_wanted():
-                line_info = "line: off (press h or r)"
-            elif line_box:
-                line_info = f"line: found {line_box[2] - line_box[0]}x{line_box[3] - line_box[1]}px"
-            else:
-                line_info = "line: no text under finger"
-            cv2.putText(frame, f"{pose_info}   {line_info}", (10, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                        (0, 255, 255), 1)
+            mode = (f"Highlight {'on' if S.highlight else 'off'}   Zoom {ZOOM_LEVELS[zoom_index]}%   "
+                    f"{pose_info}")
+            top_lines = [(status, YELLOW_BGR), (mode, WHITE_BGR)]
             if reader.status:
-                cv2.putText(frame, reader.status, (10, 106), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-            cv2.putText(frame, HELP, (10, frame.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+                top_lines.append((reader.status, ORANGE_BGR))
+            draw_text_block(frame, top_lines, 0)
+            draw_text_block(frame, [(line, WHITE_BGR) for line in HELP], -1)
             cv2.imshow(WINDOW, frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
+            elif key == ord(" "):
+                paused = not paused
+                pinching = scrolling = False
+                pending_click = None
+                forget_line()
+                announce("Paused" if paused else "Resumed")
             elif key == ord("h"):
-                status = toggle("highlight_on", "Highlight")
-            elif key == ord("r"):
-                status = toggle("ruler_on", "Ruler")
-            elif key == ord("a"):
-                status = toggle("auto_read", "Auto-read")
-            elif key == ord("d"):
-                status = toggle("dwell_on", "Dwell click")
-            elif key == ord("c"):
-                S.color_preset = (S.color_preset + 1) % len(COLOR_PRESETS)
+                S.highlight = not S.highlight
                 settings_file.save(S)
-                apply_settings()
-            elif key == ord("v"):
-                status = overlay_test()
+                forget_line()
+                announce(f"Highlight {'on' if S.highlight else 'off'}")
             elif key == ord("t"):
                 status = read_line_at(sx, sy)
             elif key == ord("s"):
                 reader.stop_speaking()
-            elif key in (ord("["), ord("]")):
-                S.ruler_dim = round(min(0.9, max(0.1, S.ruler_dim + (0.1 if key == ord("[") else -0.1))), 1)
-                ruler.set_dim(S.ruler_dim)
-                settings_file.save(S)
             elif key in (ord("-"), ord("=")):
                 S.voice_rate = min(10, max(-10, S.voice_rate + (1 if key == ord("=") else -1)))
                 reader.set_rate(S.voice_rate)
                 settings_file.save(S)
+                announce(f"Voice speed {S.voice_rate}")
 
             if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                 break  # closed with the X button
 
 finally:
-    if zoom_level > 0:
-        pyautogui.hotkey("win", "esc")  # close the magnifier
+    # put the zoom back where it started
+    while zoom_index != ZOOM_START:
+        if not zoom_by(1 if zoom_index < ZOOM_START else -1):
+            break
+    pyautogui.keyUp("ctrl")
     reader.close()
     cap.release()
     cv2.destroyAllWindows()
-    try:
-        root.destroy()
-    except tk.TclError:
-        pass
+    overlay.destroy()
     for _ in range(5):
         cv2.waitKey(1)

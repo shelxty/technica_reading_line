@@ -11,7 +11,7 @@ There are three versions:
 
 ## Windows app
 
-Needs Windows 10 or 11 and **Python 3.9 to 3.12** (MediaPipe doesn't support newer Python yet).
+Needs Windows 10 or 11, a webcam, and **Python 3.9 to 3.12** (MediaPipe doesn't support newer Python yet).
 
 ### Setup (once)
 
@@ -31,54 +31,61 @@ python reading_line.py
 ```
 
 A preview window with your webcam shows up. Click on it once so it gets your key presses.
+You can resize it to make its text bigger.
 
 ### Gestures
 
 | Gesture | What it does |
 | --- | --- |
-| Point with index finger | moves the mouse |
+| Point with your index finger | moves the mouse. The line of text under it is highlighted black on yellow |
+| Thumbs up, hold for half a second | reads the highlighted line out loud |
+| Open palm (four fingers up), then move it up / down | scroll. The further you move, the faster |
 | Quick pinch (thumb + index) | click |
-| Pinch & hold, then hand up / down | zoom in / out (Windows Magnifier) |
-| Hold index + middle finger up | highlight on / off |
-| **Open palm** (all four fingers up), then move it up / down | **scroll** (the further you move from where you started, the faster) |
-| **Thumbs up**, hold for half a second | **read the line you were pointing at out loud** |
-| **Hold the cursor still** (dwell mode on) | **click** without pinching |
+| Pinch and hold, then move your hand up / down | zoom in / out, from 50% to 300% |
+
+Zoom works like Ctrl + mouse wheel, so it zooms the app under the cursor (Chrome, Edge, Word, PDF readers...).
+The 50% to 300% steps are the ones Chrome and Edge use. When you quit, zoom goes back to where it started.
 
 ### Keys (in the preview window)
 
 | Key | What it does |
 | --- | --- |
+| `Space` | pause / resume hand control (get your mouse back without quitting) |
 | `h` | highlight on / off |
-| `r` | reading ruler on / off (dims the whole screen except your line) |
-| `c` | next highlight colors (yellow, dark, blue tint, peach, white on blue) |
-| `a` | auto-read on / off (reads each line after you stay on it for a moment) |
-| `d` | dwell click on / off |
-| `t` | read the current line now |
-| `s` | stop speaking |
-| `[` / `]` | ruler darker / lighter |
+| `t` | read the current line |
+| `s` | stop reading |
 | `-` / `=` | voice slower / faster |
-| `v` | overlay test: shows the highlight and ruler around a fake line in the middle of the screen for 3 seconds |
 | `q` or `Esc` | quit |
 
-The preview window also shows **`pose:`**, the gesture the app thinks you're making, plus your pinch
-value. If a gesture doesn't work, look there first. For example, if scrolling does nothing, check that it
-says `open palm` while your hand is open.
+The preview shows what the app is doing, the zoom level, and **`Hand:`**, the gesture it thinks you're
+making. If a gesture doesn't work, check that first.
 
-Next to it, **`line:`** says whether text was found under your finger. If the highlight or ruler doesn't
-show up:
+Settings are saved in `windows_app/settings.json`: smoothing, pinch sensitivity, how long each hold takes,
+scroll speed, zoom range, preview text size, spoken announcements. Close the app before editing it.
 
-- `line: off`: turn on highlight (`h`) or the ruler (`r`) first.
-- `line: no text under finger`: the overlays are fine, but no text was found there. Try a page with plain
-  dark text on a light background, or change `ink_diff` in `settings.json`.
-- `line: found ...` but nothing on screen: press `v`. If the test doesn't show either, the overlay
-  windows aren't drawing on your PC.
+### Accessibility (Section 508 / WCAG 2.0 AA)
 
-Your choices are saved in `windows_app/settings.json`. That file also has every other setting
-(smoothing, pinch sensitivity, dwell time, scroll speed...). Close the app before editing it.
+What the app does to meet the WCAG 2.0 AA criteria that apply to it:
+
+| Criterion | How it's handled |
+| --- | --- |
+| 1.4.3 Contrast (minimum) | Highlight is black on yellow (19.6:1). Preview text sits on a solid black box: white 21:1, yellow 19.6:1, orange 10.6:1. All above 4.5:1, and checked in the tests |
+| 1.4.1 Use of color | Every state is shown as words ("Pointing", "Zoom 150%", "PAUSED"), not just colors |
+| 1.4.4 Resize text | The preview window can be resized, and `text_scale` in `settings.json` sets the text size |
+| 2.1.1 Keyboard | Every app function has a key (see above). Everything the gestures do (mouse, scroll, Ctrl + wheel zoom) can also be done with a normal mouse or keyboard |
+| 2.1.2 No keyboard trap | `Space` pauses hand control at any time, and `q` / `Esc` / closing the window quits |
+| 2.2.1 Timing adjustable | Every hold time (`read_hold`, `hold_time`, `palm_enter`, `click_confirm`) can be made longer in `settings.json` |
+| 2.2.2 Pause, stop, hide | `s` stops reading, `Space` pauses everything, `h` hides the highlight |
+| 2.3.1 Three flashes | Nothing flashes. The highlight only moves when your finger moves to another line, and it's far smaller than the WCAG flash area |
+| 3.3.1 Error identification | Problems are shown in words in the preview, for example "No OCR: pip install winocr" or "No text here" |
+| 4.1.3 Status messages (WCAG 2.1) | Changes are also spoken ("Zoom 150 percent", "Paused", "No text here"). Turn off with `announce` |
+
+This is a self-check, not a formal audit. Official Section 508 conformance needs testing by an accessibility
+reviewer with assistive technology (for example the NVDA or JAWS screen readers).
 
 ### Tests
 
-The gesture, dwell, scroll and line-finding logic has tests that don't need a webcam:
+The gesture, scroll, zoom, line-finding and color contrast logic has tests that don't need a webcam:
 
 ```
 pip install pytest

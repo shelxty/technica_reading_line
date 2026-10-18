@@ -26,6 +26,10 @@ class Reader:
                 break
         self._q.put(img)
 
+    def say(self, text):
+        # short spoken announcement ("zoom 150 percent"). cuts off whatever was being said
+        self._q.put(("say", text))
+
     def stop_speaking(self):
         self._q.put("stop")
 
@@ -81,6 +85,9 @@ class Reader:
                 continue
             if item == "rate":
                 voice.Rate = self.rate
+                continue
+            if isinstance(item, tuple):
+                voice.Speak(item[1], SPEAK_ASYNC | PURGE)
                 continue
             try:
                 text = self._ocr(item, loop)

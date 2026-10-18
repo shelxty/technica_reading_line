@@ -5,14 +5,8 @@
 import cv2
 import numpy as np
 
-# (name, background RGB, text RGB)
-COLOR_PRESETS = [
-    ("Yellow", (255, 255, 0), (0, 0, 0)),  # the original black on yellow
-    ("Dark", (0, 0, 0), (255, 255, 0)),  # yellow on black, easier on the eyes at night
-    ("Blue tint", (200, 225, 255), (0, 0, 0)),  # soft tints some people with dyslexia prefer
-    ("Peach", (255, 218, 185), (0, 0, 0)),
-    ("White on blue", (0, 40, 120), (255, 255, 255)),
-]
+YELLOW = (255, 255, 0)
+BLACK = (0, 0, 0)  # black on yellow = 19.6:1 contrast, well above the 4.5:1 that WCAG AA asks for
 
 
 def find_line_in_gray(gray, rx, ry, snap=12, ink_diff=40, pad=3):
