@@ -19,6 +19,7 @@ keys (click on the preview window first so it gets the key presses):
     h  highlight on/off          r  reading ruler on/off      c  next highlight colors
     a  auto-read on/off          d  dwell click on/off        t  read current line now
     s  stop speaking             [ ]  ruler dimmer / brighter  - =  voice slower / faster
+    v  overlay test: shows the highlight + ruler in the middle of the screen for 3 seconds
     q or esc  quit
 """
 
@@ -232,7 +233,25 @@ def apply_settings():
 
 
 def lines_wanted():
-    return S.highlight_on or S.ruler_on or S.auto_read
+    return (S.highlight_on or S.ruler_on or S.auto_read) and time.time() > overlay_test_until
+
+
+overlay_test_until = 0.0
+
+
+def overlay_test():
+    """draws the highlight + ruler around a fake line in the middle of the screen, no text needed.
+    if you see this but not the real thing, the overlays work and it's the text detection that's off"""
+    global overlay_test_until
+    box = (SCREEN_W // 4, SCREEN_H // 2 - 20, SCREEN_W * 3 // 4, SCREEN_H // 2 + 20)
+    _, bg, fg = COLOR_PRESETS[S.color_preset % len(COLOR_PRESETS)]
+    img = np.empty((box[3] - box[1], box[2] - box[0], 3), dtype=np.uint8)
+    img[:] = bg
+    cv2.putText(img, "Reading Line overlay test", (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, fg, 2)
+    line_ov.show(img, box)
+    ruler.show(box)
+    overlay_test_until = time.time() + 3
+    return "Overlay test (3 s)"
 
 
 # ---------- hand landmarker ----------
@@ -279,7 +298,7 @@ start = time.time()
 last_t = start
 last_ts = -1
 WINDOW = "Reading Line"
-HELP = "h hl  r ruler  c colors  a auto-read  d dwell  t read  s stop  q quit"
+HELP = "h hl  r ruler  c colors  a auto-read  d dwell  t read  s stop  v test  q quit"
 
 try:
     with vision.HandLandmarker.create_from_options(options) as landmarker:
@@ -484,7 +503,18 @@ try:
                      f"Auto-read {'on' if S.auto_read else 'off'} | Dwell {'on' if S.dwell_on else 'off'} | {preset}")
             cv2.putText(frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
             cv2.putText(frame, flags, (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-            cv2.putText(frame, pose_info, (10, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            if overlay_test_until and time.time() > overlay_test_until:
+                overlay_test_until = 0.0
+                ruler.hide()
+                apply_settings()  # back to normal after the overlay test
+            if not lines_wanted():
+                line_info = "line: off (press h or r)"
+            elif line_box:
+                line_info = f"line: found {line_box[2] - line_box[0]}x{line_box[3] - line_box[1]}px"
+            else:
+                line_info = "line: no text under finger"
+            cv2.putText(frame, f"{pose_info}   {line_info}", (10, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (0, 255, 255), 1)
             if reader.status:
                 cv2.putText(frame, reader.status, (10, 106), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
             cv2.putText(frame, HELP, (10, frame.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
@@ -505,6 +535,8 @@ try:
                 S.color_preset = (S.color_preset + 1) % len(COLOR_PRESETS)
                 settings_file.save(S)
                 apply_settings()
+            elif key == ord("v"):
+                status = overlay_test()
             elif key == ord("t"):
                 status = read_line_at(sx, sy)
             elif key == ord("s"):

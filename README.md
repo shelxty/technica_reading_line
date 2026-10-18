@@ -57,11 +57,21 @@ A preview window with your webcam shows up. Click on it once so it gets your key
 | `s` | stop speaking |
 | `[` / `]` | ruler darker / lighter |
 | `-` / `=` | voice slower / faster |
+| `v` | overlay test: shows the highlight and ruler around a fake line in the middle of the screen for 3 seconds |
 | `q` or `Esc` | quit |
 
 The preview window also shows **`pose:`**, the gesture the app thinks you're making, plus your pinch
 value. If a gesture doesn't work, look there first. For example, if scrolling does nothing, check that it
 says `open palm` while your hand is open.
+
+Next to it, **`line:`** says whether text was found under your finger. If the highlight or ruler doesn't
+show up:
+
+- `line: off`: turn on highlight (`h`) or the ruler (`r`) first.
+- `line: no text under finger`: the overlays are fine, but no text was found there. Try a page with plain
+  dark text on a light background, or change `ink_diff` in `settings.json`.
+- `line: found ...` but nothing on screen: press `v`. If the test doesn't show either, the overlay
+  windows aren't drawing on your PC.
 
 Your choices are saved in `windows_app/settings.json`. That file also has every other setting
 (smoothing, pinch sensitivity, dwell time, scroll speed...). Close the app before editing it.
